@@ -1,5 +1,7 @@
 # SMART PLD Template Repository
 
+https://drive.google.com/drive/folders/1AX3-0w7BY8-Wq_HO7neli3Nqqd2wkmJ4?usp=drive_link
+
 ![Insalogo](./images/logo-insa_0.png)
 
 Template by [Riccardo Tommasini](riccardotommasini.com/) from [INSA Lyon](https://www.insa-lyon.fr/).
