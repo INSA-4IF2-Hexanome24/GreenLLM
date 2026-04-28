@@ -10,9 +10,11 @@ data_path:
   llm_data: 'data/example_data/llm_candidates/default_llm.json'
   llm_embedding_data: 'data/example_data/llm_candidates/default_llm_embeddings.json'
 
+
 model_path:
   ini_model_path: ''
   save_model_path: 'saved_models/knnrouter/knnrouter.pkl'
+  load_model_path: 'saved_models/knnrouter/knnrouter.pkl'
 
 
 metric:
