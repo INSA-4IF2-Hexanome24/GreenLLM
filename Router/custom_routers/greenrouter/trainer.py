@@ -9,8 +9,8 @@ Entraîne les deux composants du GreenKNNRouter :
 
   Composant 2 — MLP d'estimation de difficulté (PyTorch)
       Entraîné de façon supervisée :
-        label = 0 → requête facile (meilleur modèle ∈ small_models)
-        label = 1 → requête difficile (meilleur modèle ∉ small_models)
+        label = 1 → requête facile (meilleur modèle ∈ small_models)
+        label = 0 → requête difficile (meilleur modèle ∉ small_models)
 
       La loss utilisée est la Binary Cross-Entropy (BCELoss).
 """
@@ -103,34 +103,54 @@ class GreenKNNRouterTrainer(BaseTrainer):
         """
         Construit les paires (embedding, label_difficulté) pour le MLP.
 
-        Règle de labellisation :
-          - Si le meilleur modèle pour la requête appartient à small_models
-            → label = 0.0  (requête facile)
-          - Sinon
-            → label = 1.0  (requête difficile)
+        Nouvelle règle basée sur la performance réelle :
+        - On calcule la performance MOYENNE de tous les modèles sur chaque requête
+        - Si perf_moyenne >= 0.8 → requête facile → label = 0.0
+            (même les petits modèles s'en sortent bien)
+        - Si perf_moyenne < 0.8  → requête difficile → label = 1.0
+            (les modèles ont du mal)
 
-        Returns:
-            (embeddings, labels)
+        C'est plus fiable que de regarder quel modèle a gagné.
         """
         embeddings: List[np.ndarray] = []
-        labels: List[float]          = []
+        labels: List[float] = []
 
-        for i, model_name in enumerate(self.router.model_name_list):
+        # Calculer la performance moyenne par requête sur TOUS les modèles
+        perf_by_query = (
+            self.router.routing_data_train
+            .groupby("embedding_id")["performance"]
+            .mean()
+        )
+
+        # Seuil : si perf moyenne >= 0.8 → facile, sinon difficile
+        difficulty_threshold = self.router.cfg["hparam"].get(
+            "label_difficulty_threshold", 0.8
+        )
+
+        for i, emb_id in enumerate(
+            self.router.routing_data_train
+            .drop_duplicates("embedding_id")
+            .sort_values("embedding_id")["embedding_id"]
+        ):
+            if i >= len(self.router.query_embedding_list):
+                break
             embedding = self.router.query_embedding_list[i]
-            label = (
-                0.0 if model_name in self.router.small_models else 1.0
-            )
+            mean_perf = perf_by_query.get(emb_id, 0.5)
+
+            # Perf élevée = requête facile (tous les modèles y arrivent)
+            # Perf faible = requête difficile (les modèles ont du mal)
+            label = 0.0 if mean_perf >= difficulty_threshold else 1.0
+
             embeddings.append(embedding)
             labels.append(label)
 
         n_easy = sum(1 for l in labels if l == 0.0)
         n_hard = sum(1 for l in labels if l == 1.0)
-        print(f"📊 Données de difficulté :")
+        print(f"📊 Données de difficulté (seuil perf={difficulty_threshold}) :")
         print(f"   Faciles (label=0) : {n_easy}")
         print(f"   Difficiles (label=1) : {n_hard}")
 
         return embeddings, labels
-
     # ------------------------------------------------------------------
     # Entraînement KNN
     # ------------------------------------------------------------------
