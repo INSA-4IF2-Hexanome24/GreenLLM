@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 from typing import Dict, Any, Optional, Tuple
+from custom_routers.greenrouter import GreenKNNRouter, GreenKNNRouterTrainer
  
 from llmrouter.models import (
     KNNRouter,
@@ -11,6 +12,7 @@ from llmrouter.models import (
  
 ROUTER_TRAINER_REGISTRY: Dict[str, Tuple[Any, Any]] = {
     "knnrouter": (KNNRouter, KNNRouterTrainer),
+    "greenrouter": (GreenKNNRouter, GreenKNNRouterTrainer),  # ← ajouter
 }
  
 UNSUPPORTED_ROUTERS = {

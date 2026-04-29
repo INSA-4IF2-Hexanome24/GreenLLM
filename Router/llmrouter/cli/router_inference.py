@@ -13,7 +13,7 @@ from pathlib import Path
 
 from llmrouter.models import KNNRouter
 from llmrouter.utils import call_api
-
+from custom_routers.greenrouter import GreenKNNRouter
 
 def _safe_unlink(path: str) -> None:
     try:
@@ -24,6 +24,7 @@ def _safe_unlink(path: str) -> None:
 
 ROUTER_REGISTRY = {
     "knnrouter": KNNRouter,
+    "greenrouter": GreenKNNRouter,
 }
 
 
