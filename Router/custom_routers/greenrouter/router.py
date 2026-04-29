@@ -184,7 +184,7 @@ class GreenKNNRouter(MetaRouter):
         self.w_perf = hparam.get("w_perf", 1.0)
         self.w_co2  = hparam.get("w_co2",  0.3)
 
-        # ------------------------------------------------------------------
+       # ------------------------------------------------------------------
         # (4) Préparation des données d'entraînement pour le KNN
         # ------------------------------------------------------------------
         # On garde le meilleur modèle par requête (selon la performance)
@@ -208,6 +208,30 @@ class GreenKNNRouter(MetaRouter):
             self._perf_lookup[eid][row["model_name"]] = float(
                 row["performance"]
             )
+
+        # Mapping index KNN → embedding_id (utilisé dans _knn_perf_scores)
+        self._idx_to_embedding_id = {
+            i: int(row["embedding_id"])
+            for i, (_, row) in enumerate(routing_best.iterrows())
+        }
+
+        # ------------------------------------------------------------------
+        # (5) Chargement du MLP de difficulté si déjà entraîné
+        # ------------------------------------------------------------------
+        project_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(__file__))
+        )
+        diff_path = self.cfg["model_path"].get("difficulty_model_path", "")
+        if diff_path:
+            full_diff_path = os.path.join(project_root, diff_path)
+            if os.path.exists(full_diff_path):
+                self.difficulty_estimator.load_state_dict(
+                    torch.load(full_diff_path, map_location="cpu")
+                )
+                print(f"✅ MLP de difficulté chargé depuis {full_diff_path}")
+            else:
+                print(f"⚠️  MLP non entraîné encore → difficulté sera ~0.5")
+                print(f"   Lance d'abord : llmrouter train --router greenrouter")
 
         print("✅ GreenKNNRouter initialisé.")
         print(f"   Seuil de difficulté : {self.threshold}")
@@ -387,14 +411,6 @@ class GreenKNNRouter(MetaRouter):
         )
         self.knn_model = load_model(load_knn_path)
 
-        # Chargement du MLP de difficulté
-        diff_path = self.cfg["model_path"].get("difficulty_model_path", "")
-        if diff_path:
-            full_diff_path = os.path.join(project_root, diff_path)
-            if os.path.exists(full_diff_path):
-                self.difficulty_estimator.load_state_dict(
-                    torch.load(full_diff_path, map_location="cpu")
-                )
 
         # (1) Embedding
         embedding = get_longformer_embedding(query["query"]).numpy()
