@@ -1,0 +1,10 @@
+.inference-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inference-stats {
+  display: flex;
+  gap: 0.5rem;
+}
