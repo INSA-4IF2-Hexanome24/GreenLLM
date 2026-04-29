@@ -18,8 +18,33 @@ Students: **[To be assigned]**
 ## Project Objectives
 
 ## Requirements
+pip, java
 
 ## How to Run the Project
+
+### install requirements
+create virtual python environmement
+```
+python -m venv .venv
+```
+activate environnement
+
+```
+.venv\Scripts\activate
+```
+install dependencies
+```
+pip install -e .
+```
+
+### start fastapi server
+```
+cd Router
+uvicorn api:main --reload
+```
+server will be available at http://127.0.0.1:8000, documentation at http://127.0.0.1:8000/docs
+
+
 
 ## Checklist
 
