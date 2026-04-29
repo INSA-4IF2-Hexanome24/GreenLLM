@@ -1,0 +1,34 @@
+# Example Configuration for GreenRouter
+# ========================================
+
+    data_path:
+      query_data_train:     'data/.../query_train.jsonl'
+      routing_data_train:   'data/.../routing_train.jsonl'
+      query_embedding_data: 'data/.../embeddings.pt'
+      llm_data:             'data/.../llm_candidates.json'
+      co2_data:             'data/.../co2_data.json'   ← fichier CO₂
+
+    model_path:
+      ini_model_path:  ''
+      save_model_path: 'saved_models/green_knn/knn.pkl'
+      load_model_path: 'saved_models/green_knn/knn.pkl'
+      difficulty_model_path: 'saved_models/green_knn/difficulty.pt'
+
+    hparam:
+      # --- KNN ---
+      n_neighbors: 5
+      weights:     'uniform'
+      algorithm:   'auto'
+      metric:      'cosine'
+      p:           2
+      n_jobs:      -1
+
+      # --- Threshold ---
+      threshold:    0.5
+      embedding_dim: 768
+      hidden_dim:    128
+      small_models: ['GPT4o-mini', 'Llama-3-8B']   ← modèles "faciles"
+
+      # --- Score d'utilité ---
+      w_perf: 1.0    ← poids de la performance
+      w_co2:  0.3    ← poids du coût CO₂ (à ajuster selon vos priorités)
