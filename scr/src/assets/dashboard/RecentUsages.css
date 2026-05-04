@@ -1,7 +1,7 @@
 .recent-list {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.75rem;
 }
 
 .recent-item {
@@ -18,7 +18,8 @@
 
 .recent-item__name {
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  color: #1e293b;
 }
 
 .recent-item__date {

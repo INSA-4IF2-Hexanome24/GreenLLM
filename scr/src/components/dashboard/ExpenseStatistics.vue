@@ -7,7 +7,7 @@
           type="pie"
           :data="chartData"
           :options="chartOptions"
-          style="height: 220px"
+          style="height: 160px"
         />
         <div class="expense-legend">
           <div

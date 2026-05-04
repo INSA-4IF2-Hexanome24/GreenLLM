@@ -1,0 +1,36 @@
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.topbar__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.topbar__search {
+  border-radius: 2rem !important;
+  font-size: 0.875rem;
+  width: 220px;
+}
+
+.topbar__icon-btn {
+  color: #64748b !important;
+}
+
+.topbar__avatar {
+  cursor: pointer;
+}

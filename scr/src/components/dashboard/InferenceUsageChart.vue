@@ -13,7 +13,7 @@
         type="line"
         :data="chartData"
         :options="chartOptions"
-        style="height: 220px"
+        style="height: 160px"
       />
     </template>
   </Card>
@@ -64,10 +64,10 @@ onMounted(async () => {
     datasets: [
       {
         data: rawData.value.credits,
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        borderColor: '#5D9628',
+        backgroundColor: 'rgba(222, 254, 101, 0.15)',
         fill: true,
-        pointBackgroundColor: '#3b82f6',
+        pointBackgroundColor: '#5D9628',
       },
     ],
   }

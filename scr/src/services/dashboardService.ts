@@ -28,10 +28,10 @@ export async function getWeeklyCO2() {
 
 export async function getExpenseStatistics() {
   return [
-    { label: 'Sales', value: 30, color: '#1a1a2e' },
-    { label: 'HR Team', value: 15, color: '#f97316' },
-    { label: 'Engineering', value: 35, color: '#3b82f6' },
-    { label: 'Marketing', value: 20, color: '#ec4899' },
+    { label: 'Sales', value: 30, color: '#343C6A' },
+    { label: 'HR Team', value: 15, color: '#5D9628' },
+    { label: 'Engineering', value: 35, color: '#F3D914' },
+    { label: 'Marketing', value: 20, color: '#A6DB16' },
   ]
 }
 

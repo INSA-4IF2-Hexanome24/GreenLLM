@@ -1,3 +1,3 @@
 ﻿<template>
-  <div>Budget</div>
+  <div><h1>Budget</h1></div>
 </template>

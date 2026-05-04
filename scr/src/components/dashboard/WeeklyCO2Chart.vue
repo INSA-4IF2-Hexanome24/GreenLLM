@@ -6,7 +6,7 @@
         type="bar"
         :data="chartData"
         :options="chartOptions"
-        style="height: 220px"
+         style="height: 220px"
       />
     </template>
   </Card>
@@ -34,13 +34,13 @@ onMounted(async () => {
       {
         label: 'Actually Used',
         data: co2.actualUsed,
-        backgroundColor: '#22d3ee',
+        backgroundColor: '#DEFE65',
         borderRadius: 6,
       },
       {
         label: 'Estimated Use',
         data: co2.estimatedUse,
-        backgroundColor: '#3b82f6',
+        backgroundColor: '#5D9628',
         borderRadius: 6,
       },
     ],

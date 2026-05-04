@@ -1,12 +1,12 @@
-// src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      redirect: '/user/dashboard',
+      redirect: '/login',
     },
     {
       path: '/login',
@@ -19,32 +19,27 @@ const router = createRouter({
     {
       path: '/user',
       component: () => import('@/components/layout/AppLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
-        {
-          path: 'dashboard',
-          component: () => import('@/views/dashboard/DashboardView.vue'),
-        },
-        {
-          path: 'routing',
-          component: () => import('@/views/RoutingView.vue'),
-        },
-        {
-          path: 'budget',
-          component: () => import('@/views/BudgetView.vue'),
-        },
-      ],
-    },
-    {
-      path: '/company',
-      component: () => import('@/components/layout/AppLayout.vue'),
-      children: [
-        {
-          path: 'dashboard',
-          component: () => import('@/views/dashboard/DashboardView.vue'),
-        },
+  { path: 'dashboard', component: () => import('@/views/dashboard/DashboardView.vue') },
+  { path: 'routing', component: () => import('@/views/RoutingView.vue') },
+  { path: 'accounts', component: () => import('@/views/AccountsView.vue') },
+  { path: 'budget', component: () => import('@/views/BudgetView.vue') },
+  { path: 'reports', component: () => import('@/views/ReportsView.vue') },
+  { path: 'carbon', component: () => import('@/views/CarbonView.vue') },
+  { path: 'models', component: () => import('@/views/ModelsView.vue') },
+  { path: 'settings', component: () => import('@/views/SettingsView.vue') },
       ],
     },
   ],
+})
+
+// Navigation guard
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return '/login'
+  }
 })
 
 export default router
