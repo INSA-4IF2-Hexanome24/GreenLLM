@@ -1,5 +1,7 @@
 package GreenLLM.app.model;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,6 +24,8 @@ public class Utilisateur {
     private String prenom;
     private String nom;
     private String motDePasse;
+    private BigDecimal budget = BigDecimal.ZERO;
+    private BigDecimal budgetConsomme = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
     private StatutUtilisateur statut;
@@ -103,6 +107,22 @@ public class Utilisateur {
 
     public void setMotDePasse(String motDePasse) {
         this.motDePasse = motDePasse;
+    }
+
+    public BigDecimal getBudget() {
+        return budget;
+    }
+
+    public void setBudget(BigDecimal budget) {
+        this.budget = budget;
+    }
+
+    public BigDecimal getBudgetConsomme() {
+        return budgetConsomme;
+    }
+
+    public void setBudgetConsomme(BigDecimal budgetConsomme) {
+        this.budgetConsomme = budgetConsomme;
     }
 
     public StatutUtilisateur getStatut() {

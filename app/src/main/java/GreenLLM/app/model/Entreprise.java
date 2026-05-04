@@ -1,5 +1,6 @@
 package GreenLLM.app.model;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -26,6 +27,8 @@ public class Entreprise {
     private String siret;
     private String domaine;
     private String motDePasse;
+    private BigDecimal budget = BigDecimal.ZERO;
+    private BigDecimal budgetConsomme = BigDecimal.ZERO;
 
     @OneToMany
     private Set<Groupe> groupes = new HashSet<>();
@@ -88,6 +91,22 @@ public class Entreprise {
 
     public void setMotDePasse(String motDePasse) {
         this.motDePasse = motDePasse;
+    }
+
+    public BigDecimal getBudget() {
+        return budget;
+    }
+
+    public void setBudget(BigDecimal budget) {
+        this.budget = budget;
+    }
+
+    public BigDecimal getBudgetConsomme() {
+        return budgetConsomme;
+    }
+
+    public void setBudgetConsomme(BigDecimal budgetConsomme) {
+        this.budgetConsomme = budgetConsomme;
     }
 
     public Set<Groupe> getGroupes() {

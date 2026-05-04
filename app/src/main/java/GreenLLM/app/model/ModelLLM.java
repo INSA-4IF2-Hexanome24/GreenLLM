@@ -1,5 +1,7 @@
 package GreenLLM.app.model;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,6 +16,7 @@ public class ModelLLM {
 
     private String nom;
     private double co2ParToken;
+    private BigDecimal coutParToken = BigDecimal.ZERO;
 
     public ModelLLM() {
     }
@@ -21,6 +24,12 @@ public class ModelLLM {
     public ModelLLM(String nom, double co2ParToken) {
         this.nom = nom;
         this.co2ParToken = co2ParToken;
+    }
+
+    public ModelLLM(String nom, double co2ParToken, BigDecimal coutParToken) {
+        this.nom = nom;
+        this.co2ParToken = co2ParToken;
+        this.coutParToken = coutParToken;
     }
 
     public Long getId() {
@@ -45,5 +54,13 @@ public class ModelLLM {
 
     public void setCo2ParToken(double co2ParToken) {
         this.co2ParToken = co2ParToken;
+    }
+
+    public BigDecimal getCoutParToken() {
+        return coutParToken;
+    }
+
+    public void setCoutParToken(BigDecimal coutParToken) {
+        this.coutParToken = coutParToken;
     }
 }

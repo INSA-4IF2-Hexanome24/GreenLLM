@@ -1,5 +1,7 @@
 package GreenLLM.app.model;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,9 +18,14 @@ public class Requete {
     private Long id;
 
     private String description;
+    private int nombreTokens;
+    private BigDecimal coutTotal = BigDecimal.ZERO;
 
     @ManyToOne
     private Utilisateur user;
+
+    @ManyToOne
+    private ModelLLM modelLLM;
 
     public Requete() {
     }
@@ -26,6 +33,13 @@ public class Requete {
     public Requete(String description, Utilisateur user) {
         this.description = description;
         this.user = user;
+    }
+
+    public Requete(String description, Utilisateur user, ModelLLM modelLLM, int nombreTokens) {
+        this.description = description;
+        this.user = user;
+        this.modelLLM = modelLLM;
+        this.nombreTokens = nombreTokens;
     }
 
     public Long getId() {
@@ -44,11 +58,35 @@ public class Requete {
         this.description = description;
     }
 
+    public int getNombreTokens() {
+        return nombreTokens;
+    }
+
+    public void setNombreTokens(int nombreTokens) {
+        this.nombreTokens = nombreTokens;
+    }
+
+    public BigDecimal getCoutTotal() {
+        return coutTotal;
+    }
+
+    public void setCoutTotal(BigDecimal coutTotal) {
+        this.coutTotal = coutTotal;
+    }
+
     public Utilisateur getUser() {
         return user;
     }
 
     public void setUser(Utilisateur user) {
         this.user = user;
+    }
+
+    public ModelLLM getModelLLM() {
+        return modelLLM;
+    }
+
+    public void setModelLLM(ModelLLM modelLLM) {
+        this.modelLLM = modelLLM;
     }
 }

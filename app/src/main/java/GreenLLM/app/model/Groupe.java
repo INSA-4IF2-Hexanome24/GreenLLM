@@ -1,5 +1,6 @@
 package GreenLLM.app.model;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import jakarta.persistence.Entity;
@@ -29,6 +30,8 @@ public class Groupe {
 
     private int niveauGroupe;
     private String departement;
+    private BigDecimal budget = BigDecimal.ZERO;
+    private BigDecimal budgetConsomme = BigDecimal.ZERO;
 
     @ManyToOne
     private Utilisateur admin;
@@ -97,6 +100,22 @@ public class Groupe {
 
     public void setDepartement(String departement) {
         this.departement = departement;
+    }
+
+    public BigDecimal getBudget() {
+        return budget;
+    }
+
+    public void setBudget(BigDecimal budget) {
+        this.budget = budget;
+    }
+
+    public BigDecimal getBudgetConsomme() {
+        return budgetConsomme;
+    }
+
+    public void setBudgetConsomme(BigDecimal budgetConsomme) {
+        this.budgetConsomme = budgetConsomme;
     }
 
     public Utilisateur getAdmin() {

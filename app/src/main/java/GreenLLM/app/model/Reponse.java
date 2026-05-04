@@ -15,12 +15,18 @@ public class Reponse {
     private Long id;
 
     private String description;
+    private int nombreTokens;
 
     public Reponse() {
     }
 
     public Reponse(String description) {
         this.description = description;
+    }
+
+    public Reponse(String description, int nombreTokens) {
+        this.description = description;
+        this.nombreTokens = nombreTokens;
     }
 
     public Long getId() {
@@ -37,5 +43,13 @@ public class Reponse {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public int getNombreTokens() {
+        return nombreTokens;
+    }
+
+    public void setNombreTokens(int nombreTokens) {
+        this.nombreTokens = nombreTokens;
     }
 }
