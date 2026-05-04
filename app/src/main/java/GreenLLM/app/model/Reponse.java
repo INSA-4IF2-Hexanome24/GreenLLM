@@ -4,12 +4,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "requete")
-public class Requete {
+@Table(name = "reponse")
+public class Reponse {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,15 +16,11 @@ public class Requete {
 
     private String description;
 
-    @ManyToOne
-    private Utilisateur user;
-
-    public Requete() {
+    public Reponse() {
     }
 
-    public Requete(String description, Utilisateur user) {
+    public Reponse(String description) {
         this.description = description;
-        this.user = user;
     }
 
     public Long getId() {
@@ -42,13 +37,5 @@ public class Requete {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public Utilisateur getUser() {
-        return user;
-    }
-
-    public void setUser(Utilisateur user) {
-        this.user = user;
     }
 }
