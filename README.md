@@ -23,6 +23,10 @@ pip, java
 ## How to Run the Project
 
 ### install requirements
+go to router folder
+```
+cd Router
+```
 create virtual python environmement
 ```
 python -m venv .venv
@@ -40,7 +44,7 @@ pip install -e .
 ### start fastapi server
 ```
 cd Router
-uvicorn api:main --reload
+uvicorn endpoint.api:main --reload
 ```
 server will be available at http://127.0.0.1:8000, documentation at http://127.0.0.1:8000/docs
 

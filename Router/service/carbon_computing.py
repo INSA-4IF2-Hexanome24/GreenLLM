@@ -1,5 +1,12 @@
 """Carbon footprint computation helpers for the FastAPI endpoint."""
 
+import os
+
+try:
+	from openai import OpenAI
+except ImportError:  # pragma: no cover
+	OpenAI = None
+
 CARBON_COST_PER_TOKEN = {
 	"gpt-4": 0.00000015,
 	"gpt-4-turbo": 0.00000012,
@@ -23,12 +30,38 @@ ESTIMATED_OUTPUT_TOKENS = {
 }
 
 
-def calculate_request_carbon_footprint() -> dict:
+def _count_input_tokens(query: str) -> int:
+	"""Count input tokens for the request query.
+
+	Uses the OpenAI token counter when the optional dependency and API key are
+	available, and falls back to a simple local estimate otherwise.
+	"""
+	text = query.strip()
+	if not text:
+		return 0
+
+	api_key = os.getenv("OPENAI_API_KEY", "").strip()
+	if OpenAI is not None and api_key:
+		try:
+			client = OpenAI(api_key=api_key)
+			model_name = os.getenv("LLMROUTER_TOKEN_COUNT_MODEL", "gpt-5")
+			response = client.responses.input_tokens.count(
+				model=model_name,
+				input=[{"role": "user", "content": text}],
+			)
+			return int(response.input_tokens)
+		except Exception:
+			pass
+
+	return len(text.split())
+
+
+def calculate_request_carbon_footprint(query: str) -> dict:
 	"""Return mock carbon footprint metrics for each model.
 
-	The request input size is fixed for now, while output tokens depend on the model.
+	The request input size is derived from the query text, while output tokens depend on the model.
 	"""
-	input_tokens = 50
+	input_tokens = _count_input_tokens(query)
 
 	results = {
 		"request_metrics": {
@@ -49,14 +82,5 @@ def calculate_request_carbon_footprint() -> dict:
 			"total_carbon_cost_kg_co2": round(total_carbon, 10),
 			"total_carbon_cost_mg_co2": round(total_carbon * 1_000_000, 3),
 		}
-
-	sorted_models = sorted(
-		results["models"].items(),
-		key=lambda item: item[1]["total_carbon_cost_kg_co2"],
-	)
-
-	results["models_sorted_by_greenest"] = [
-		{"model": model, **metrics} for model, metrics in sorted_models
-	]
 
 	return results
