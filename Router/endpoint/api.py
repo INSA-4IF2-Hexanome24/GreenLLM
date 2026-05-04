@@ -2,6 +2,9 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from service.carbon_computing import calculate_request_carbon_footprint
 
 
 DEFAULT_CORS_ORIGINS = [
@@ -12,7 +15,6 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
-
 
 def get_cors_origins() -> list[str]:
     raw_origins = os.getenv("LLMROUTER_CORS_ORIGINS", "").strip()
@@ -41,8 +43,9 @@ def root() -> dict[str, str]:
 
 
 @main.get("/carbon")
-def calculate_request_carbon_footprint() -> dict[str, str]:
-    return {"status": "ok"}
+def calculate_request_carbon_footprint_endpoint() -> JSONResponse:
+    """Return the mock carbon footprint payload as JSON."""
+    return JSONResponse(content=calculate_request_carbon_footprint())
 
 
 @main.get("/bestLLM")
