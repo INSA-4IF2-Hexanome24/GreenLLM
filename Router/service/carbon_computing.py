@@ -50,9 +50,11 @@ def _count_input_tokens(query: str) -> int:
 				input=[{"role": "user", "content": text}],
 			)
 			return int(response.input_tokens)
-		except Exception:
+		except Exception as e:
+			print(f"Error counting tokens with OpenAI API: {str(e)}")
 			pass
 
+	print("Warning: OpenAI API not available or failed, using fallback token count.")
 	return len(text.split())
 
 
