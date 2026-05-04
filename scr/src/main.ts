@@ -6,9 +6,11 @@ import Aura from "@primevue/themes/aura";
 import "primeicons/primeicons.css";
 import './assets/main.css'
 import { createPinia } from 'pinia'
+import ToastService from 'primevue/toastservice'
 
 const app = createApp(App);
 
+app.use(ToastService)
 app.use(createPinia())
 app.use(router);
 app.use(PrimeVue, {
