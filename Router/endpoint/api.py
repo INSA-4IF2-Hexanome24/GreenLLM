@@ -68,11 +68,11 @@ def get_utility_scores(query: str) -> JSONResponse:
     Args:
         query: the query text passed as query string
 
-    Returns:
-        JSONResponse containing:
-          - routers: list of models [{"model", "utility", "performance", "co2"}, ...]
-          - difficulty_score: difficulty score [0,1]
-          - threshold: router threshold
+    Returns:  
+        JSONResponse containing:  
+          - routers: list of models [{"model", "utility", "performance", "co2"}, ...]  
+          - difficulty_score: difficulty score [0,1]  
+          - threshold: router threshold  
           - best_model: model selected with the best utility
     """
     result = UtilityScoringService.score_query(query)

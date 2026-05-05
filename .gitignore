@@ -77,3 +77,6 @@ Router/.mypy_cache/
 
 # MkDocs build output
 site/
+
+# perso
+script_video.md
