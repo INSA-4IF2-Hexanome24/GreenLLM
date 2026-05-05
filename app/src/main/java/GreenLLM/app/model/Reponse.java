@@ -1,5 +1,7 @@
 package GreenLLM.app.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -20,6 +22,7 @@ public class Reponse {
     private ModelLLM modelUtilise; 
 
     private String description;
+    @JsonAlias({"nbre_de_token", "nbre_tokens", "nombre_tokens", "output_tokens", "output_tokens_estimated"})
     private int nombreTokens;
 
     public Reponse() {

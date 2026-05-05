@@ -32,7 +32,7 @@ public class BudgetService {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal cout = chercherCoutPourUneReponse(modelLLM, reponse);
+        BigDecimal cout = calculerCoutModelePourRequeteEtReponse(modelLLM, requete, reponse);
         requete.setCoutTotal(cout);
         return cout;
     }
@@ -53,14 +53,14 @@ public class BudgetService {
 
         BigDecimal totalCouts = BigDecimal.ZERO;
         for (ModelLLM modele : modeles) {
-            totalCouts = totalCouts.add(calculerCoutModelePourReponse(modele, reponse));
+            totalCouts = totalCouts.add(calculerCoutModelePourRequeteEtReponse(modele, requete, reponse));
         }
 
         BigDecimal moyenneCouts = totalCouts.divide(
                 BigDecimal.valueOf(modeles.size()),
                 10,
                 RoundingMode.HALF_UP);
-        BigDecimal coutModele = calculerCoutModelePourReponse(modelLLM, reponse);
+        BigDecimal coutModele = calculerCoutModelePourRequeteEtReponse(modelLLM, requete, reponse);
 
         return moyenneCouts.subtract(coutModele);
     }
@@ -115,6 +115,17 @@ public class BudgetService {
         }
 
         return calculerCoutModelePourNombreTokens(modelLLM, reponse.getNombreTokens());
+    }
+
+    private BigDecimal calculerCoutModelePourRequeteEtReponse(ModelLLM modelLLM, Requete requete, Reponse reponse) {
+        if (modelLLM == null || requete == null || reponse == null) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal inputCost = calculerCoutModelePourNombreTokens(modelLLM, requete.getNombreTokens());
+        BigDecimal outputCost = calculerCoutModelePourNombreTokens(modelLLM, reponse.getNombreTokens());
+
+        return inputCost.add(outputCost);
     }
 
     private BigDecimal calculerCoutModelePourNombreTokens(ModelLLM modelLLM, int nombreTokens) {

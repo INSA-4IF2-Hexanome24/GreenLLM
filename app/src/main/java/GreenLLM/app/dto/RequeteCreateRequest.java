@@ -1,9 +1,12 @@
 package GreenLLM.app.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 public class RequeteCreateRequest {
 
     private String description;
     private Long utilisateurId;
+    @JsonAlias({"nbre_de_token", "nbre_tokens", "nombre_tokens", "input_tokens"})
     private int nombreTokens;
 
     public RequeteCreateRequest() {

@@ -2,6 +2,8 @@ package GreenLLM.app.model;
 
 import java.math.BigDecimal;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,6 +20,7 @@ public class Requete {
     private Long id;
 
     private String description;
+    @JsonAlias({"nbre_de_token", "nbre_tokens", "nombre_tokens", "input_tokens"})
     private int nombreTokens;
     private BigDecimal coutTotal = BigDecimal.ZERO;
 
