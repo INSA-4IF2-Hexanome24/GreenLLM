@@ -1,7 +1,6 @@
-"""
-Utils package for LLMRouter scripts
-"""
+""" Utils package for LLMRouter scripts """
 
+from .embeddings import get_longformer_embedding, get_longformer_embeddings_batch, parallel_embedding_task
 from .data_loader import (
     load_csv,
     load_jsonl,
@@ -63,22 +62,22 @@ except Exception:  # pragma: no cover
     cem_score = _missing_eval_dep
     calculate_task_performance = _missing_eval_dep
 
-__all__ = ["load_csv",
-    "load_jsonl",
-    "jsonl_to_csv",
-    "load_pt",
-    'get_longformer_embedding', 'parallel_embedding_task',
-    'to_tensor', 'clean_df',
-    'format_mc_prompt', 'format_gsm8k_prompt', 'format_math_prompt',
-    'format_commonsense_qa_prompt', 'format_mbpp_prompt', 'format_humaneval_prompt',
-    'generate_task_query', 'ProgressTracker',
-    'extract_user_prompt', 'extract_model_response',
-    'aggregate_preferences_by_query', 'calculate_model_scores',
-    'extract_arena_user_prompt', 'extract_arena_model_response',
-    'aggregate_arena_preferences_by_query', 'calculate_arena_model_scores',
-    'process_final_data', 'generate_embeddings_for_data',
-    'TASK_DESCRIPTIONS', 'TASK_CATEGORIES', 'API_KEYS', 'HF_TOKEN', 'CASE_NUM',
-    'setup_environment',
-    'f1_score', 'exact_match_score', 'get_bert_score', 'evaluate_code', 'cem_score', 'calculate_task_performance',
-    'call_api', 'format_api_request_with_task'
+__all__ = [
+    "load_csv", "load_jsonl", "jsonl_to_csv", "load_pt",
+    "get_longformer_embedding", "get_longformer_embeddings_batch", "parallel_embedding_task",
+    "to_tensor", "clean_df",
+    "format_mc_prompt", "format_gsm8k_prompt", "format_math_prompt",
+    "format_commonsense_qa_prompt", "format_mbpp_prompt", "format_humaneval_prompt",
+    "generate_task_query", "ProgressTracker",
+    "extract_user_prompt", "extract_model_response",
+    "aggregate_preferences_by_query", "calculate_model_scores",
+    "extract_arena_user_prompt", "extract_arena_model_response",
+    "aggregate_arena_preferences_by_query", "calculate_arena_model_scores",
+    "process_final_data", "generate_embeddings_for_data",
+    "TASK_DESCRIPTIONS", "TASK_CATEGORIES", "API_KEYS", "HF_TOKEN", "CASE_NUM",
+    "setup_environment",
+    "f1_score", "exact_match_score", "get_bert_score", "evaluate_code", "cem_score",
+    "calculate_task_performance",
+    "call_api", "format_api_request_with_task",
+    "save_model", "load_model",
 ]

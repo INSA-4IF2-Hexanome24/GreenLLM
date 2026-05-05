@@ -36,6 +36,7 @@ dependencies = [
   "uvicorn",
   "websockets",
   "httpx",
+  "aiohttp",
 ]
 
 classifiers = [

@@ -44,8 +44,8 @@ Router/env/
 Thumbs.db
 
 # Repository-level model artifacts
-saved_models/
 Router/saved_models/
+Router/llmrouter/saved_models/
 
 # Router data and generated outputs
 Router/*.csv
@@ -74,6 +74,13 @@ Router/*.tmp
 Router/.cache/
 Router/.pytest_cache/
 Router/.mypy_cache/
+Router/llmrouter/data/tmp_aggregated_routing.csv
 
 # MkDocs build output
 site/
+
+# perso
+script_video.md
+Router/monitor_log.txt
+Router/monitor_run.ps1
+Router/train_log.txt

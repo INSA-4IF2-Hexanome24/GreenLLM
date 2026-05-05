@@ -1,4 +1,5 @@
 import os
+import traceback
 import yaml
 from abc import ABC, abstractmethod
 
@@ -41,26 +42,37 @@ class MetaRouter(nn.Module, ABC):
         self.metric_weights = []
 
         if yaml_path is not None:
+            print(f"[META-DEBUG] yaml_path={yaml_path}", flush=True)
             if not os.path.exists(yaml_path):
                 raise FileNotFoundError(f"YAML file not found: {yaml_path}")
 
-            with open(yaml_path, "r", encoding="utf-8") as f:
-                self.cfg = yaml.safe_load(f)
+            try:
+                print("[META-DEBUG] Opening YAML config...", flush=True)
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    self.cfg = yaml.safe_load(f)
+                print("[META-DEBUG] YAML config loaded.", flush=True)
 
-            # Compute project root (two levels up from models/)
-            project_root = os.path.abspath(
-                os.path.join(os.path.dirname(__file__), "../..")
-            )
+                # Compute project root (two levels up from models/)
+                project_root = os.path.abspath(
+                    os.path.join(os.path.dirname(__file__), "../..")
+                )
+                print(f"[META-DEBUG] project_root={project_root}", flush=True)
 
-            # Load data via DataLoader (side-effect: attach datasets to `self`)
-            loader = DataLoader(project_root)
-            loader.load_data(self.cfg, self)
+                # Load data via DataLoader (side-effect: attach datasets to `self`)
+                loader = DataLoader(project_root)
+                print("[META-DEBUG] Loading data via DataLoader...", flush=True)
+                loader.load_data(self.cfg, self)
+                print("[META-DEBUG] DataLoader finished.", flush=True)
 
-            # Load metric weights if provided
-            weights_dict = self.cfg.get("metric", {}).get("weights", {})
-            self.metric_weights = list(weights_dict.values())
+                # Load metric weights if provided
+                weights_dict = self.cfg.get("metric", {}).get("weights", {})
+                self.metric_weights = list(weights_dict.values())
 
-            print("✅ MetaRouter initialized successfully (YAML + data loaded).")
+                print("✅ MetaRouter initialized successfully (YAML + data loaded).", flush=True)
+            except Exception:
+                print("[META-DEBUG] MetaRouter init failed. Traceback:", flush=True)
+                traceback.print_exc()
+                raise
 
     # ------------------------------------------------------------------
     # Core abstract method: subclasses must define routing behavior

@@ -7,13 +7,13 @@ from custom_routers.greenrouter import GreenKNNRouter
 
 
 class UtilityScoringService:
-    """Service for scoring queries with the GreenKNNRouter."""
+    """Service pour scorer les requêtes avec le GreenKNNRouter."""
 
     _router_instance = None
 
     @classmethod
     def get_router(cls) -> GreenKNNRouter:
-        """Load or retrieve the GreenKNNRouter instance."""
+        """Charge ou récupère l'instance du GreenKNNRouter."""
         if cls._router_instance is None:
             project_root = os.path.dirname(os.path.dirname(__file__))
             config_path = os.path.join(
@@ -30,23 +30,23 @@ class UtilityScoringService:
     @classmethod
     def score_query(cls, query_text: str) -> Dict[str, Any]:
         """
-        Score a text query with the GreenKNNRouter.
+        Score une requête textuelle avec le GreenKNNRouter.
 
         Args:
-            query_text: the query text
+            query_text: texte de la requête
 
         Returns:
-            dict with:
-              - routers: list of models with their utility scores, sorted in descending order
-              - difficulty_score: estimated difficulty score [0,1]
-              - threshold: router difficulty threshold
+            dict avec :
+              - routers: liste des modèles avec leurs scores d'utilité, triés décroissant
+              - difficulty_score: score de difficulté estimé [0,1]
+              - threshold: seuil de difficulté du router
         """
         router = cls.get_router()
 
-        # Route the query
+        # Routage de la requête
         result = router.route_single({"query": query_text})
 
-        # Extract and sort utility scores
+        # Extraction et tri des scores d'utilité
         utility_scores = result.get("utility_scores", {})
         routers = [
             {
@@ -58,12 +58,21 @@ class UtilityScoringService:
             for model, score in utility_scores.items()
         ]
 
-        # Sort by utility descending
+        # Tri par utilité décroissante
         routers.sort(key=lambda x: x["utility"], reverse=True)
-
-        return {
-            "routers": routers,
-            "difficulty_score": float(result.get("difficulty_score", 0.0)),
-            "threshold": float(result.get("threshold", 0.0)),
-            "best_model": result.get("model_name"),
-        }
+        model_name = result.get("model_name")
+        if( model_name == "web_search" ):
+            return{
+                        "routers": routers,
+                        "difficulty_score": float(result.get("difficulty_score", 0.0)),
+                        "threshold": float(result.get("threshold", 0.0)),
+                        "best_model": model_name,
+                        "answers": result.get("answers", []),
+                }
+        else:
+            return {
+                "routers": routers,
+                "difficulty_score": float(result.get("difficulty_score", 0.0)),
+                "threshold": float(result.get("threshold", 0.0)),
+                "best_model": model_name,
+            }
