@@ -1,0 +1,181 @@
+.register-wrapper {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.register-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.register-card {
+  position: relative;
+  z-index: 1;
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.register-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.register-tabs {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.register-tab {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #64748b;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.register-tab--active {
+  color: #16a34a;
+  border-bottom-color: #16a34a;
+}
+
+.register-tab:hover:not(.register-tab--active) {
+  color: #334155;
+}
+
+.register-body {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.register-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 5rem;
+  height: 5rem;
+}
+
+.register-avatar__img {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #e2e8f0;
+}
+
+.register-avatar__btn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.register-fields {
+  flex: 1;
+}
+
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.register-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.register-save-btn {
+  background-color: #16a34a !important;
+  border-color: #16a34a !important;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  padding: 0.5rem 2.5rem;
+}
+
+.register-placeholder {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  padding: 1rem 0;
+}
+
+/* Shared with LoginView.css — duplicated here for scoping */
+.login-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.login-logo {
+  height: 2.5rem;
+  width: 2.5rem;
+}
+
+.login-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.login-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.login-link {
+  color: #16a34a;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.login-link:hover {
+  color: #15803d;
+}
+
+.login-register {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.register-grid__full {
+  grid-column: span 2;
+}
