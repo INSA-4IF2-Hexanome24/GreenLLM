@@ -1,0 +1,37 @@
+.account-stats {
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 1.25rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.account-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.account-stat__label {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.account-stat__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.account-stat__value--danger {
+  color: #dc2626;
+}
+
+.account-stat__divider {
+  width: 1px;
+  height: 2.5rem;
+  background: #e2e8f0;
+  flex-shrink: 0;
+}

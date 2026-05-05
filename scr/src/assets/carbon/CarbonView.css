@@ -1,0 +1,31 @@
+.carbon {
+  padding: 1.5rem;
+  background: #f1f5f9;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.carbon__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.carbon__hero-row {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.carbon__grid {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.carbon__grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}

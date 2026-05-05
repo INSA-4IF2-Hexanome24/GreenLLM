@@ -164,3 +164,241 @@ export async function getRecentTransactions() {
     },
   ]
 }
+
+
+//---------------------------Carbon dashboard mock data ------------------------------
+
+export async function getCO2SavedOverTime() {
+  return {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    data: [200, 320, 280, 350, 300, 390],
+  }
+}
+
+export async function getCO2EmissionsOverTime() {
+  return {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+    data: [480, 520, 410, 390, 220],
+  }
+}
+
+export async function getCO2ByModel() {
+  return {
+    labels: ['Claude', 'GPT-4', 'Mistral', 'Gemini'],
+    data: [40, 25, 20, 15],
+  }
+}
+
+export async function getCO2ByTeam() {
+  return {
+    labels: ['Engineering', 'HR', 'Direction', 'Marketing'],
+    data: [40, 20, 25, 15],
+  }
+}
+
+export async function getCarbonSavings(range: string) {
+  const data: Record<string, string> = {
+    'Jan – Feb': '180kgCO2e',
+    'Mar – Apr': '260kgCO2e',
+    'May – Jun': '400kgCO2e',
+    'Jul – Aug': '310kgCO2e',
+    'Sep – Oct': '290kgCO2e',
+    'Nov – Dec': '350kgCO2e',
+  }
+  return {
+    saved: data[range] ?? '—',
+    dateRange: range,
+  }
+}
+
+export async function getCarbonStats() {
+  return [
+    { label: 'Actual emissions', value: '820 kgCO2e',  icon: 'pi pi-send' },
+    { label: 'Baseline',         value: '1,220 kgCO2e', icon: 'pi pi-globe' },
+    { label: 'Reduction',        value: '32.8%',        icon: 'pi pi-chart-line' },
+  ]
+}
+
+export async function getTopSpenders() {
+  return [
+    { name: 'Jaime Rey',      time: '5h ago',      value: 100, avatar: '/avatars/jaime.jpg' },
+    { name: 'Martin Vasquez', time: '2 days ago',  value: 50,  avatar: '/avatars/martin.jpg' },
+    { name: 'Liam LeGoat',   time: '5 days ago',  value: 20,  avatar: '/avatars/liam.jpg' },
+    { name: 'Josue Vega',    time: '10 days ago', value: 10,  avatar: '/avatars/josue.jpg' },
+  ]
+}
+
+export async function getTopSavers() {
+  return [
+    { name: 'Jaime Rey',      time: '5h ago',      value: 100, avatar: '/avatars/jaime.jpg' },
+    { name: 'Martin Vasquez', time: '2 days ago',  value: 50,  avatar: '/avatars/martin.jpg' },
+    { name: 'Liam LeGoat',   time: '5 days ago',  value: 20,  avatar: '/avatars/liam.jpg' },
+    { name: 'Josue Vega',    time: '10 days ago', value: 10,  avatar: '/avatars/josue.jpg' },
+  ]
+}
+
+//---------------------------comptes employess ---------------------------------
+
+export async function getAccountsStats() {
+  return {
+    totalMembers: 8,
+    totalBudget: '$1,640,000',
+    totalSpent: '$312,400',
+    overBudget: 2,
+  }
+}
+
+export async function getAccounts() {
+  return [
+    {
+      id: 1,
+      name: 'Jaime Rey',
+      avatar: '/avatars/jaime.jpg',
+      department: 'Engineering',
+      monthlyBudget: 40500,
+      used: 38200,
+      status: 'active',
+    },
+    {
+      id: 2,
+      name: 'Ewan McGregor',
+      avatar: '/avatars/ewan.jpg',
+      department: 'Direction',
+      monthlyBudget: 250000,
+      used: 261000,
+      status: 'active',
+    },
+    {
+      id: 3,
+      name: 'Martin Vasquez',
+      avatar: '/avatars/martin.jpg',
+      department: 'Engineering',
+      monthlyBudget: 900000,
+      used: 420000,
+      status: 'active',
+    },
+    {
+      id: 4,
+      name: 'Liam LeGoat',
+      avatar: '/avatars/liam.jpg',
+      department: 'Marketing',
+      monthlyBudget: 50000,
+      used: 51200,
+      status: 'suspended',
+    },
+    {
+      id: 5,
+      name: 'Josue Vega',
+      avatar: '/avatars/josue.jpg',
+      department: 'HR',
+      monthlyBudget: 50000,
+      used: 8000,
+      status: 'active',
+    },
+    {
+      id: 6,
+      name: 'Sofia Reyes',
+      avatar: '/avatars/sofia.jpg',
+      department: 'Marketing',
+      monthlyBudget: 80000,
+      used: 64000,
+      status: 'active',
+    },
+    {
+      id: 7,
+      name: 'Noah Petit',
+      avatar: '/avatars/noah.jpg',
+      department: 'HR',
+      monthlyBudget: 12000,
+      used: 1560,
+      status: 'active',
+    },
+    {
+      id: 8,
+      name: 'Amira Osei',
+      avatar: '/avatars/amira.jpg',
+      department: 'Engineering',
+      monthlyBudget: 160000,
+      used: 160800,
+      status: 'active',
+    },
+  ]
+}
+
+export async function updateAccountBudget(id: number, newBudget: number) {
+  // POST /accounts/:id/budget
+  console.log(`Updated account ${id} budget to ${newBudget}`)
+}
+
+export async function toggleAccountStatus(id: number, status: 'active' | 'suspended') {
+  // POST /accounts/:id/status
+  console.log(`Account ${id} status set to ${status}`)
+}
+
+//------------------------data for models page ------------------------------
+
+export async function getModels() {
+  return [
+    {
+      id: 1,
+      name: 'gpt-4o',
+      provider: 'OpenAI',
+      type: 'remote',
+      apiKey: '****  **** 5600',
+      displayName: 'GPT-4 Omni',
+      budget: 1000,
+      allowedTeams: ['Engineering', 'Marketing'],
+      icon: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
+    },
+    {
+      id: 2,
+      name: 'claude-3-5-sonnet',
+      provider: 'Anthropic',
+      type: 'remote',
+      apiKey: '**** **** 4300',
+      displayName: 'Claude Sonnet',
+      budget: 2000,
+      allowedTeams: ['Direction', 'HR'],
+      icon: 'https://upload.wikimedia.org/wikipedia/commons/8/8a/Claude_AI_logo.svg',
+    },
+    {
+      id: 3,
+      name: 'llama3',
+      provider: 'Ollama',
+      type: 'local',
+      ollamaUrl: 'http://localhost:11434',
+      displayName: 'Llama 3 Local',
+      budget: 500,
+      allowedTeams: ['Engineering'],
+      icon: 'https://ollama.com/public/ollama.png',
+    },
+    {
+      id: 4,
+      name: 'mistral',
+      provider: 'Mistral',
+      type: 'remote',
+      apiKey: '**** **** 8821',
+      displayName: 'Mistral 7B',
+      budget: 800,
+      allowedTeams: ['Marketing'],
+      icon: 'https://mistral.ai/images/logo_hubc88c4ece131b91c7cb753f40e9e1cc5_2589_256x0_resize_q97_h2_lanczos_3.webp',
+    },
+  ]
+}
+
+export async function addModel(model: Record<string, any>) {
+  // POST /models
+  console.log('Adding model:', model)
+}
+
+export async function deleteModel(id: number) {
+  // DELETE /models/:id
+  console.log('Deleting model:', id)
+}
+
+export async function getTeamsAndMembers() {
+  return {
+    teams: ['Engineering', 'HR', 'Direction', 'Marketing'],
+    members: ['Jaime Rey', 'Ewan McGregor', 'Martin Vasquez', 'Liam LeGoat', 'Josue Vega', 'Sofia Reyes', 'Noah Petit', 'Amira Osei'],
+  }
+}

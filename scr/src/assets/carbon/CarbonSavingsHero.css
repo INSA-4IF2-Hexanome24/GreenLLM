@@ -1,0 +1,95 @@
+.carbon-hero {
+  background: linear-gradient(135deg, #2d4a1e, #5d9628);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  min-width: 260px;
+  flex: 1;
+}
+
+.carbon-hero__left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.carbon-hero__label {
+  font-size: 0.85rem;
+  color: #d4f7a0;
+}
+
+.carbon-hero__value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.carbon-hero__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.carbon-hero__dates-label {
+  font-size: 0.7rem;
+  color: #d4f7a0;
+  letter-spacing: 0.05em;
+}
+
+.carbon-hero__dropdown-wrapper {
+  position: relative;
+}
+
+.carbon-hero__date-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 0.5rem;
+  color: #ffffff;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.carbon-hero__date-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.carbon-hero__dropdown {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  background: #1a2e0f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  min-width: 130px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.carbon-hero__dropdown-item {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  color: #d4f7a0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.carbon-hero__dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.carbon-hero__dropdown-item--active {
+  font-weight: 700;
+  color: #ffffff;
+}
