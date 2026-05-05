@@ -30,7 +30,13 @@ import os
 import re
 from typing import Any, Dict, List, Optional
 
-import aiohttp
+try:
+    import aiohttp
+    _AIOHTTP_AVAILABLE = True
+except ImportError:
+    _AIOHTTP_AVAILABLE = False
+    aiohttp = None  # type: ignore
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -268,13 +274,17 @@ class GreenKNNRouter(MetaRouter):
         )
 
         # ------------------------------------------------------------------ #
-        # 6. Load KNN from disk ONCE                                          #
+        # 6. Load KNN from disk ONCE (si déjà entraîné)                      #
         # ------------------------------------------------------------------ #
         load_knn_path = os.path.join(
             project_root, self.cfg["model_path"]["load_model_path"]
         )
-        self.knn_model = load_model(load_knn_path)
-        print(f"✅ KNN loaded from {load_knn_path}")
+        if os.path.exists(load_knn_path):
+            self.knn_model = load_model(load_knn_path)
+            print(f"✅ KNN loaded from {load_knn_path}")
+        else:
+            print(f"ℹ️  KNN not found at {load_knn_path} — instance vide, sera créé à l'entraînement.")
+            # knn_model reste l'instance vide créée à l'étape 1
 
         # ------------------------------------------------------------------ #
         # 7. Load MLP if available                                            #
@@ -543,13 +553,26 @@ class GreenKNNRouter(MetaRouter):
 
     async def _call_api_async(
         self,
-        session: aiohttp.ClientSession,
+        session: Any,  # aiohttp.ClientSession ou None
         request: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
-        Fire a single LLM API call asynchronously.
-        Falls back to the synchronous call_api() if aiohttp is unavailable.
+        Appel API asynchrone (aiohttp) avec fallback synchrone (call_api).
+        Si aiohttp n'est pas installé, tourne en mode synchrone.
         """
+        if not _AIOHTTP_AVAILABLE or session is None:
+            # Fallback synchrone
+            try:
+                result = call_api(request, max_tokens=1024, temperature=0.7)
+                return {
+                    "response":          result.get("response", ""),
+                    "prompt_tokens":     result.get("prompt_tokens", 0),
+                    "completion_tokens": result.get("completion_tokens", 0),
+                }
+            except Exception as e:
+                print(f"❌ Sync API error: {e}")
+                return {"response": "", "prompt_tokens": 0, "completion_tokens": 0, "error": str(e)}
+
         try:
             payload = {
                 "model":       request["api_name"],
@@ -586,7 +609,9 @@ class GreenKNNRouter(MetaRouter):
         """
         results: List[Dict[str, Any]] = []
 
-        async with aiohttp.ClientSession() as session:
+        # Ouvre une session aiohttp si disponible, sinon None (fallback sync)
+        session = aiohttp.ClientSession() if _AIOHTTP_AVAILABLE else None
+        try:
             tasks = []
             meta  = []  # parallel metadata for result assembly
 
@@ -702,6 +727,10 @@ class GreenKNNRouter(MetaRouter):
                         row_copy["task_performance"] = tp
 
                 results.append(row_copy)
+
+        finally:
+            if session is not None:
+                await session.close()
 
         return results
 
