@@ -195,7 +195,6 @@ class GreenKNNRouter(MetaRouter):
         # ------------------------------------------------------------------ #
         knn_params = {
             k: hparam[k]
-            k: hparam[k]
             for k in ("n_neighbors", "weights", "algorithm",
                       "metric", "p", "n_jobs", "leaf_size")
             if k in hparam
@@ -418,7 +417,6 @@ class GreenKNNRouter(MetaRouter):
         perf_scores: Dict[str, float],
         candidate_models: List[str],
         co2_norm: Optional[Dict[str, float]] = None,
-        co2_norm: Optional[Dict[str, float]] = None,
     ) -> Dict[str, float]:
         if co2_norm is None:
             co2_norm = self._co2_norm
@@ -547,7 +545,6 @@ class GreenKNNRouter(MetaRouter):
             print(f"❌ Async API error: {e}")
             return {"response": "", "prompt_tokens": 0, "completion_tokens": 0, "error": str(e)}
 
-    async def _route_batch_async(
     # ------------------------------------------------------------------ #
     # Async helper for concurrent API calls                               #
     # ------------------------------------------------------------------ #
@@ -587,9 +584,6 @@ class GreenKNNRouter(MetaRouter):
 
     async def _route_batch_async(
         self,
-        rows: List[Dict[str, Any]],
-        routing_results: List[Dict[str, Any]],
-        task_name: Optional[str],
         rows: List[Dict[str, Any]],
         routing_results: List[Dict[str, Any]],
         task_name: Optional[str],
