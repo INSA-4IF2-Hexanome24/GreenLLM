@@ -1,7 +1,7 @@
 """
 Embedding utilities for LLMRouter scripts (Longformer version)
 """
-
+import numpy as np
 import os
 import torch
 from transformers import AutoModel, AutoTokenizer
@@ -131,3 +131,14 @@ def parallel_embedding_task(data):
         query_t_embedding = None
 
     return id, query_t_embedding, success
+
+# À ajouter à la fin de embeddings.py
+
+def get_longformer_embeddings_batch(queries: list) -> np.ndarray:
+    """
+    Batch wrapper autour de get_longformer_embedding.
+    Utilise le modèle lazy-loadé — pas besoin de passer model/tokenizer.
+    """
+    import numpy as np
+    result = get_longformer_embedding(queries)   # accepte déjà une liste
+    return result.numpy() if hasattr(result, "numpy") else result
