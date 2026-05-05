@@ -51,4 +51,6 @@ public class Reponse {
     public ModelLLM getModelUtilise(){
         return this.modelUtilise;
     }
+
+    
 }
