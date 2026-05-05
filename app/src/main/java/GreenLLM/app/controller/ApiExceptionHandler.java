@@ -16,6 +16,18 @@ public class ApiExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(message);
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(message);
+        if (message != null && message.contains("introuvable")) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(message);
+        }
+
+        if (message != null && message.contains("n'appartient pas")) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(message);
+        }
+
+        if (message != null && message.contains("Identifiants invalides")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(message);
+        }
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
     }
 }

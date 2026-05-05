@@ -1,5 +1,7 @@
 package GreenLLM.app.dto;
 
+import java.math.BigDecimal;
+
 import GreenLLM.app.model.Adresse;
 import GreenLLM.app.model.StatutUtilisateur;
 
@@ -11,6 +13,7 @@ public class UserRegisterRequest {
     private String motDePasse;
     private StatutUtilisateur statut;
     private Adresse adresse;
+    private BigDecimal budget;
 
     public UserRegisterRequest() {
     }
@@ -61,5 +64,13 @@ public class UserRegisterRequest {
 
     public void setAdresse(Adresse adresse) {
         this.adresse = adresse;
+    }
+
+    public BigDecimal getBudget() {
+        return budget;
+    }
+
+    public void setBudget(BigDecimal budget) {
+        this.budget = budget;
     }
 }

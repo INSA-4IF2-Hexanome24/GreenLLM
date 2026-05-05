@@ -1,5 +1,7 @@
 package GreenLLM.app.service;
 
+import java.math.BigDecimal;
+
 import org.springframework.stereotype.Service;
 
 import GreenLLM.app.dto.AuthResponse;
@@ -35,6 +37,8 @@ public class UserAuthService {
                 statut,
                 null,
                 request.getAdresse());
+        utilisateur.setBudget(valeur(request.getBudget()));
+        utilisateur.setBudgetConsomme(BigDecimal.ZERO);
 
         Utilisateur savedUtilisateur = utilisateurRepository.save(utilisateur);
         return new AuthResponse(savedUtilisateur.getId(), "USER", "Utilisateur cree");
@@ -49,5 +53,9 @@ public class UserAuthService {
         }
 
         return new AuthResponse(utilisateur.getId(), "USER", "Connexion utilisateur reussie");
+    }
+
+    private BigDecimal valeur(BigDecimal montant) {
+        return montant != null ? montant : BigDecimal.ZERO;
     }
 }

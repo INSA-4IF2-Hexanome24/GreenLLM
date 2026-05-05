@@ -24,9 +24,6 @@ public class Requete {
     @ManyToOne
     private Utilisateur user;
 
-    @ManyToOne
-    private ModelLLM modelLLM;
-
     public Requete() {
     }
 
@@ -35,10 +32,9 @@ public class Requete {
         this.user = user;
     }
 
-    public Requete(String description, Utilisateur user, ModelLLM modelLLM, int nombreTokens) {
+    public Requete(String description, Utilisateur user, int nombreTokens) {
         this.description = description;
         this.user = user;
-        this.modelLLM = modelLLM;
         this.nombreTokens = nombreTokens;
     }
 
@@ -80,13 +76,5 @@ public class Requete {
 
     public void setUser(Utilisateur user) {
         this.user = user;
-    }
-
-    public ModelLLM getModelLLM() {
-        return modelLLM;
-    }
-
-    public void setModelLLM(ModelLLM modelLLM) {
-        this.modelLLM = modelLLM;
     }
 }
