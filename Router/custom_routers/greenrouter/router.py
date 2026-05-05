@@ -225,7 +225,7 @@ class GreenKNNRouter(MetaRouter):
         # ------------------------------------------------------------------ #
         web_cfg = self.cfg.get("web_search", {})
         self.use_web_search      = web_cfg.get("use_web_search", False)
-        self.web_search_threshold = web_cfg.get("web_search_threshold", 0.15)
+        self.web_search_threshold = web_cfg.get("web_search_threshold", 0.8)
 
         if self.use_web_search:
             self.web_searcher = WebSearcher(
