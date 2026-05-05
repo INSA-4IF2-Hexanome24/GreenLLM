@@ -1,24 +1,27 @@
 """
-GreenKNNRouter  —  optimised version
--------------------------------------
-Key runtime improvements over the original:
-
-  1. KNN model loaded ONCE at __init__, not on every route_single call.
-  2. Batch embeddings: route_batch computes all Longformer embeddings in one
-     forward pass instead of N sequential calls.
-  3. Batch difficulty estimation: all MLP scores in one tensor operation.
-  4. Batch KNN: kneighbors() called once for the whole batch.
-  5. TF-IDF vectoriser reused across searches (fitted lazily, not rebuilt
-     every call).
-  6. _perf_lookup and _idx_to_embedding_id built with vectorised pandas ops
-     instead of iterrows().
-  7. Async HTTP: route_batch fires all LLM API calls concurrently with
-     asyncio + aiohttp, then collects results — eliminates the serial
-     latency wall.
-  8. CO₂ normalisation constants pre-computed once.
-  9. Candidate-model set cached to avoid repeated dict lookups.
- 10. Minor: torch.inference_mode() instead of torch.no_grad() (lower
-     overhead in PyTorch ≥ 1.9).
+GreenKNNRouter  —  version finale
+----------------------------------
+Base : version qui fonctionne à l'entraînement (doc4)
+Optimisations intégrées :
+  1.  KNN chargé UNE FOIS dans __init__ (conditionnel si fichier existe).
+  2.  Batch embeddings : route_batch calcule tous les embeddings en un seul
+      forward pass au lieu de N appels séquentiels.
+  3.  Batch difficulty : tous les scores MLP en une seule opération tenseur.
+  4.  Batch KNN : kneighbors() appelé une seule fois pour tout le batch.
+  5.  TF-IDF vectoriser réutilisé (pas recréé à chaque recherche web).
+  6.  _perf_lookup et _idx_to_embedding_id construits avec pivot pandas
+      au lieu de iterrows() → 50-100× plus rapide.
+  7.  Async HTTP : route_batch lance tous les appels LLM en parallèle
+      (asyncio + aiohttp optionnel, fallback sync si absent).
+  8.  Normalisation CO₂ pré-calculée une fois dans __init__.
+  9.  Liste des modèles candidats mise en cache.
+ 10.  torch.inference_mode() au lieu de torch.no_grad().
+ 11.  difficulty_weight : coefficient de difficulté modulant l'utilité
+      (petits modèles avantagés si facile, grands si difficile) — doc4.
+ 12.  Web search (DuckDuckGo + TF-IDF) — doc5.
+ 13.  _log_timestamp : horodatage optionnel des étapes — doc4.
+ 14.  mlp_trained + decision_reason dans les outputs — cohérence affichage.
+ 15.  Robustesse premier entraînement : KNN absent → instance vide créée.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ import copy
 import json
 import os
 import re
+from datetime import datetime
+from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 try:
@@ -38,9 +43,9 @@ except ImportError:
     aiohttp = None  # type: ignore
 
 import numpy as np
+import requests
 import torch
 import torch.nn as nn
-import requests
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -50,18 +55,31 @@ from llmrouter.models.meta_router import MetaRouter
 from llmrouter.utils import (
     load_model,
     get_longformer_embedding,
-    get_longformer_embeddings_batch,   # batch variant — add this to utils if absent
     call_api,
     generate_task_query,
     calculate_task_performance,
 )
 
+# Import batch embedding si disponible, sinon fallback séquentiel
+try:
+    from llmrouter.utils import get_longformer_embeddings_batch
+    _BATCH_EMBED_AVAILABLE = True
+except ImportError:
+    _BATCH_EMBED_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
-# MLP difficulty estimator  (unchanged API, same architecture)
+# Module d'estimation de difficulté
 # ---------------------------------------------------------------------------
 
 class DifficultyEstimator(nn.Module):
+    """
+    MLP léger estimant la difficulté d'une requête ∈ [0, 1].
+
+    Entrée  : embedding [batch_size, input_dim]
+    Sortie  : score     [batch_size, 1]
+    """
+
     def __init__(self, input_dim: int, hidden_dim: int = 128):
         super().__init__()
         self.network = nn.Sequential(
@@ -79,35 +97,32 @@ class DifficultyEstimator(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Web searcher  —  reuses a single TfidfVectorizer instance
+# Module de recherche web (doc5)
 # ---------------------------------------------------------------------------
 
 class WebSearcher:
+    """Recherche DuckDuckGo + filtrage TF-IDF. Vectoriseur réutilisé."""
+
     DDGO_URL = "https://api.duckduckgo.com/"
 
     def __init__(self, max_results: int = 5, min_tfidf_score: float = 0.1):
         self.max_results     = max_results
         self.min_tfidf_score = min_tfidf_score
-        # Reuse across calls: avoids re-instantiation overhead each search.
-        self._vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+        self._vectorizer     = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
 
     def search(self, query: str) -> Optional[Dict[str, Any]]:
         try:
-            raw_results = self._fetch_duckduckgo(query)
+            raw = self._fetch_duckduckgo(query)
         except Exception as e:
             print(f"⚠️  Erreur recherche web : {e}")
             return None
 
-        if not raw_results:
+        if not raw:
             return None
 
-        ranked   = self._tfidf_filter(query, raw_results)
+        ranked   = self._tfidf_filter(query, raw)
         filtered = [r for r in ranked if r["score"] >= self.min_tfidf_score]
-
-        if not filtered:
-            return None
-
-        return {"answers": filtered, "best": filtered[0]}
+        return {"answers": filtered, "best": filtered[0]} if filtered else None
 
     def _fetch_duckduckgo(self, query: str) -> List[Dict[str, str]]:
         params  = {"q": query, "format": "json", "no_html": "1", "skip_disambig": "1"}
@@ -116,12 +131,11 @@ class WebSearcher:
         resp.raise_for_status()
         data    = resp.json()
 
-        results = []
+        results: List[Dict[str, str]] = []
         if data.get("AbstractText"):
             results.append({"text": data["AbstractText"], "url": data.get("AbstractURL", "")})
         if data.get("Answer"):
             results.append({"text": str(data["Answer"]), "url": data.get("AbstractURL", "")})
-
         for topic in data.get("RelatedTopics", [])[:self.max_results]:
             if isinstance(topic, dict) and topic.get("Text"):
                 results.append({"text": topic["Text"], "url": topic.get("FirstURL", "")})
@@ -129,7 +143,6 @@ class WebSearcher:
                 for sub in topic["Topics"]:
                     if sub.get("Text"):
                         results.append({"text": sub["Text"], "url": sub.get("FirstURL", "")})
-
         return results[:self.max_results]
 
     def _tfidf_filter(
@@ -139,55 +152,57 @@ class WebSearcher:
     ) -> List[Dict[str, Any]]:
         if not results:
             return []
-
         texts = [r["text"] for r in results]
-
-        # Fit a fresh vectorizer per query (queries are too distinct to share
-        # vocabulary across calls, so we still need to fit).  However we reuse
-        # the Python object to avoid __init__ overhead on every search call.
         try:
             tfidf_matrix = self._vectorizer.fit_transform([query] + texts)
         except ValueError:
             return []
-
         scores = cosine_similarity(tfidf_matrix[0], tfidf_matrix[1:])[0]
-
-        ranked = []
-        for i, score in enumerate(scores):
-            text = re.sub(r"<[^>]+>", "", results[i]["text"]).strip()
-            ranked.append({"answer": text, "source": results[i]["url"], "score": float(score)})
-
+        ranked = [
+            {
+                "answer": re.sub(r"<[^>]+>", "", results[i]["text"]).strip(),
+                "source": results[i]["url"],
+                "score":  float(scores[i]),
+            }
+            for i in range(len(results))
+        ]
         ranked.sort(key=lambda x: x["score"], reverse=True)
         return ranked[:self.max_results]
 
 
 # ---------------------------------------------------------------------------
-# Main router
+# Routeur principal
 # ---------------------------------------------------------------------------
 
 class GreenKNNRouter(MetaRouter):
     """
-    GreenKNNRouter — optimised.
+    GreenKNNRouter — version finale fusionnée.
 
-    Performance-critical changes vs original:
-    -----------------------------------------
-    • KNN model loaded once in __init__ (was: reloaded on every call).
-    • route_batch: embeddings + MLP scores computed in a single batch pass.
-    • route_batch: kneighbors() called once for all rows.
-    • route_batch: LLM API calls issued concurrently via asyncio/aiohttp.
-    • CO₂ min/max normalisation constants pre-computed in __init__.
-    • _perf_lookup and _idx_to_embedding_id built with vectorised pandas ops.
-    • torch.inference_mode() replaces torch.no_grad() (lower overhead).
+    Combine :
+    (1) KNN       → performance estimée sur les K voisins historiques
+    (2) Threshold → seuil de difficulté (petits vs tous les modèles)
+    (3) CO₂       → pénalité carbone normalisée
+    (4) difficulty_weight → coefficient modulant l'utilité selon difficulté
+    (5) Web search → court-circuit DuckDuckGo si difficulté > seuil web
+
+    Fonction d'utilité :
+        base(m)    = w_perf · perf_knn(m) - w_co2 · co2_norm(m)
+        coeff(m)   = 1 + difficulty_weight · (1-diff si petit, diff si grand)
+        utility(m) = base(m) · coeff(m)
     """
 
     def __init__(self, yaml_path: str):
+        init_start = perf_counter()
+
         dummy = nn.Identity()
         super().__init__(model=dummy, yaml_path=yaml_path)
 
         hparam = self.cfg["hparam"]
+        self.enable_timing = hparam.get("enable_timing", False)
+        self._log("init: MetaRouter loaded", init_start)
 
         # ------------------------------------------------------------------ #
-        # 1. KNN classifier                                                   #
+        # 1. Classifieur KNN (instance vide — sera rempli si .pkl existe)     #
         # ------------------------------------------------------------------ #
         knn_params = {
             k: hparam[k]
@@ -196,9 +211,10 @@ class GreenKNNRouter(MetaRouter):
             if k in hparam
         }
         self.knn_model = KNeighborsClassifier(**knn_params)
+        self._log("init: KNN classifier created", init_start)
 
         # ------------------------------------------------------------------ #
-        # 2. MLP difficulty estimator                                         #
+        # 2. MLP d'estimation de difficulté                                   #
         # ------------------------------------------------------------------ #
         embedding_dim = hparam.get("embedding_dim", 768)
         hidden_dim    = hparam.get("hidden_dim", 128)
@@ -206,12 +222,14 @@ class GreenKNNRouter(MetaRouter):
             input_dim=embedding_dim,
             hidden_dim=hidden_dim,
         )
-        self.model     = self.difficulty_estimator
-        self.threshold = hparam.get("threshold", 0.5)
+        self.model            = self.difficulty_estimator
+        self.threshold        = hparam.get("threshold", 0.5)
         self.small_models: List[str] = hparam.get("small_models", [])
+        self.difficulty_weight = hparam.get("difficulty_weight", 0.5)
+        self._log("init: difficulty estimator created", init_start)
 
         # ------------------------------------------------------------------ #
-        # 3. CO₂ data                                                         #
+        # 3. Données CO₂                                                      #
         # ------------------------------------------------------------------ #
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         co2_path     = os.path.join(project_root, self.cfg["data_path"].get("co2_data", ""))
@@ -219,30 +237,31 @@ class GreenKNNRouter(MetaRouter):
         if os.path.exists(co2_path):
             with open(co2_path, "r", encoding="utf-8") as f:
                 self.co2_data = json.load(f)
-            print(f"✅ CO₂ data loaded from {co2_path}")
+            print(f"✅ Données CO₂ chargées depuis {co2_path}")
         else:
-            print(f"⚠️  CO₂ file not found: {co2_path}")
+            print(f"⚠️  Fichier CO₂ introuvable : {co2_path}")
 
         self.w_perf = hparam.get("w_perf", 1.0)
         self.w_co2  = hparam.get("w_co2",  0.3)
+        self._log("init: CO₂ data loaded", init_start)
 
         # ------------------------------------------------------------------ #
-        # 4. Web search                                                        #
+        # 4. Recherche web (optionnelle)                                      #
         # ------------------------------------------------------------------ #
         web_cfg = self.cfg.get("web_search", {})
-        self.use_web_search      = web_cfg.get("use_web_search", False)
-        self.web_search_threshold = web_cfg.get("web_search_threshold", 0.15)
-
+        self.use_web_search       = web_cfg.get("use_web_search", False)
+        self.web_search_threshold = web_cfg.get("web_search_threshold", 0.8)
         if self.use_web_search:
             self.web_searcher = WebSearcher(
                 max_results=web_cfg.get("max_results", 5),
                 min_tfidf_score=web_cfg.get("min_tfidf_score", 0.1),
             )
+            print(f"✅ Recherche web activée (seuil difficulty > {self.web_search_threshold})")
         else:
             self.web_searcher = None
 
         # ------------------------------------------------------------------ #
-        # 5. Training data — vectorised lookups (no iterrows)                 #
+        # 5. Données d'entraînement — lookups vectorisés (pas de iterrows)   #
         # ------------------------------------------------------------------ #
         routing_best = self.routing_data_train.loc[
             self.routing_data_train.groupby("query")["performance"].idxmax()
@@ -252,42 +271,44 @@ class GreenKNNRouter(MetaRouter):
         self.query_embedding_list = [self.query_embedding_data[i].numpy() for i in ids]
         self.model_name_list      = routing_best["model_name"].tolist()
 
-        # Vectorised pivot instead of iterrows — typically 50-100× faster.
-        pivot = (
-            self.routing_data_train
-            .pivot_table(
-                index="embedding_id",
-                columns="model_name",
-                values="performance",
-                aggfunc="first",
-            )
+        # pivot_table au lieu de iterrows : 50-100× plus rapide
+        pivot = self.routing_data_train.pivot_table(
+            index="embedding_id",
+            columns="model_name",
+            values="performance",
+            aggfunc="first",
         )
         self._perf_lookup: Dict[int, Dict[str, float]] = {
-            int(eid): {col: float(val) for col, val in row.items() if not np.isnan(val)}
+            int(eid): {
+                col: float(val)
+                for col, val in row.items()
+                if not np.isnan(val)
+            }
             for eid, row in pivot.iterrows()
         }
 
-        # Numpy array for O(1) index → embedding_id mapping.
+        # tableau numpy pour mapping O(1) : index KNN → embedding_id
         self._idx_to_embedding_id_arr = np.array(
             [int(row["embedding_id"]) for _, row in routing_best.iterrows()],
             dtype=np.int64,
         )
+        self._log("init: training data prepared", init_start)
 
         # ------------------------------------------------------------------ #
-        # 6. Load KNN from disk ONCE (si déjà entraîné)                      #
+        # 6. Chargement KNN depuis disque (conditionnel)                      #
         # ------------------------------------------------------------------ #
         load_knn_path = os.path.join(
             project_root, self.cfg["model_path"]["load_model_path"]
         )
         if os.path.exists(load_knn_path):
             self.knn_model = load_model(load_knn_path)
-            print(f"✅ KNN loaded from {load_knn_path}")
+            print(f"✅ KNN chargé depuis {load_knn_path}")
         else:
-            print(f"ℹ️  KNN not found at {load_knn_path} — instance vide, sera créé à l'entraînement.")
-            # knn_model reste l'instance vide créée à l'étape 1
+            print(f"ℹ️  KNN introuvable ({load_knn_path}) — instance vide, sera créé à l'entraînement.")
+        self._log("init: KNN load check done", init_start)
 
         # ------------------------------------------------------------------ #
-        # 7. Load MLP if available                                            #
+        # 7. Chargement MLP si disponible                                     #
         # ------------------------------------------------------------------ #
         self._mlp_trained = False
         diff_path = self.cfg["model_path"].get("difficulty_model_path", "")
@@ -298,41 +319,60 @@ class GreenKNNRouter(MetaRouter):
                     torch.load(full_diff_path, map_location="cpu")
                 )
                 self._mlp_trained = True
-                print(f"✅ MLP difficulty model loaded from {full_diff_path}")
+                print(f"✅ MLP de difficulté chargé depuis {full_diff_path}")
             else:
                 print(
-                    "⚠️  MLP not trained yet — difficulty_score in output is UNRELIABLE "
-                    "(random weights → saturates near 0 or 1). "
-                    "Train first: llmrouter train --router greenrouter"
+                    "⚠️  MLP non entraîné — difficulty_score sera peu fiable "
+                    "(poids aléatoires → valeurs proches de 0 ou 1). "
+                    "Lance : llmrouter train --router greenrouter"
                 )
-
-        self.difficulty_estimator.eval()   # permanently in eval mode
+        self.difficulty_estimator.eval()   # mode éval permanent
+        self._log("init: MLP load check done", init_start)
 
         # ------------------------------------------------------------------ #
-        # 8. Pre-compute CO₂ normalisation constants for all candidate models #
+        # 8. Pré-calcul normalisation CO₂ + liste modèles candidats           #
         # ------------------------------------------------------------------ #
         self._candidate_models: List[str] = self._build_candidate_list()
         self._co2_norm: Dict[str, float]  = self._build_co2_norm(self._candidate_models)
 
-        print("✅ GreenKNNRouter initialised.")
-        print(f"   Difficulty threshold : {self.threshold}")
-        print(f"   Small models         : {self.small_models}")
+        print("✅ GreenKNNRouter initialisé.")
+        print(f"   Seuil difficulté    : {self.threshold}")
+        print(f"   difficulty_weight   : {self.difficulty_weight}")
+        print(f"   Petits modèles      : {self.small_models}")
         print(f"   w_perf={self.w_perf}, w_co2={self.w_co2}")
+        self._log("init: GreenKNNRouter fully initialized", init_start)
 
     # ---------------------------------------------------------------------- #
-    # Private helpers                                                         #
+    # Timing                                                                  #
+    # ---------------------------------------------------------------------- #
+
+    def _log(self, step_name: str, step_start: Optional[float] = None) -> None:
+        """Log horodaté avec durée écoulée (actif si enable_timing=True)."""
+        if not getattr(self, "enable_timing", False):
+            return
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        if step_start is None:
+            print(f"[TIMING {now}] {step_name}")
+        else:
+            print(f"[TIMING {now}] {step_name} | elapsed={perf_counter() - step_start:.3f}s")
+
+    # ---------------------------------------------------------------------- #
+    # Helpers privés                                                          #
     # ---------------------------------------------------------------------- #
 
     def _build_candidate_list(self) -> List[str]:
         return list(self.llm_data.keys()) if self.llm_data else list(set(self.model_name_list))
 
     def _build_co2_norm(self, candidates: List[str]) -> Dict[str, float]:
-        """Pre-compute normalised CO₂ per model so _compute_utility is O(n)."""
+        """Normalisation min-max du CO₂ sur les candidats → dict pré-calculé."""
         values    = [self.co2_data.get(m, 0.0) for m in candidates]
         co2_min   = min(values) if values else 0.0
         co2_max   = max(values) if values else 1.0
         co2_range = (co2_max - co2_min) or 1.0
         return {m: (self.co2_data.get(m, 0.0) - co2_min) / co2_range for m in candidates}
+
+    def _get_candidate_models(self) -> List[str]:
+        return self._candidate_models
 
     def _get_fallback_small_model(self) -> str:
         for m in self.small_models:
@@ -340,57 +380,35 @@ class GreenKNNRouter(MetaRouter):
                 return m
         return self._candidate_models[0] if self._candidate_models else "unknown"
 
+    def _select_candidates(self, difficulty: float) -> List[str]:
+        """Petits modèles si difficulty < threshold, tous sinon."""
+        if difficulty < self.threshold and self.small_models:
+            candidates = [m for m in self._candidate_models if m in self.small_models]
+            return candidates if candidates else self._candidate_models
+        return self._candidate_models
+
     # ------------------------------------------------------------------ #
-    # Single-item difficulty (used by route_single)                       #
+    # Difficulté                                                           #
     # ------------------------------------------------------------------ #
+
     def _estimate_difficulty(self, embedding: np.ndarray) -> float:
+        """Score de difficulté pour un embedding unique."""
         with torch.inference_mode():
             t = torch.tensor(embedding, dtype=torch.float32).unsqueeze(0)
             return float(self.difficulty_estimator(t).item())
 
-    # ------------------------------------------------------------------ #
-    # Batch difficulty (used by route_batch)                              #
-    # ------------------------------------------------------------------ #
     def _estimate_difficulty_batch(self, embeddings: np.ndarray) -> np.ndarray:
         """
-        embeddings : (N, D) float32 numpy array
-        returns    : (N,)   float32 numpy array of difficulty scores
+        Scores de difficulté pour un batch d'embeddings.
+        embeddings : (N, D) → retourne (N,)
         """
         with torch.inference_mode():
             t = torch.tensor(embeddings, dtype=torch.float32)
             return self.difficulty_estimator(t).squeeze(-1).numpy()
 
     # ------------------------------------------------------------------ #
-    # KNN performance scores — single query                               #
+    # KNN                                                                  #
     # ------------------------------------------------------------------ #
-    def _knn_perf_scores(
-        self,
-        embedding: np.ndarray,
-        candidate_models: List[str],
-    ) -> Dict[str, float]:
-        distances, indices = self.knn_model.kneighbors([embedding])
-        return self._aggregate_knn(
-            distances[0], indices[0], candidate_models
-        )
-
-    # ------------------------------------------------------------------ #
-    # KNN performance scores — batch of queries                           #
-    # ------------------------------------------------------------------ #
-    def _knn_perf_scores_batch(
-        self,
-        embeddings: np.ndarray,
-        candidate_models: List[str],
-    ) -> List[Dict[str, float]]:
-        """
-        embeddings : (N, D)
-        Returns a list of N perf-score dicts, one per row.
-        Single kneighbors() call for the whole batch.
-        """
-        distances_batch, indices_batch = self.knn_model.kneighbors(embeddings)
-        return [
-            self._aggregate_knn(distances_batch[i], indices_batch[i], candidate_models)
-            for i in range(len(embeddings))
-        ]
 
     def _aggregate_knn(
         self,
@@ -398,6 +416,7 @@ class GreenKNNRouter(MetaRouter):
         indices: np.ndarray,
         candidate_models: List[str],
     ) -> Dict[str, float]:
+        """Agrège les performances des K voisins (pondération uniforme ou distance)."""
         if self.knn_model.weights == "distance":
             weights = np.where(distances == 0, 1e10, 1.0 / distances)
         else:
@@ -406,162 +425,200 @@ class GreenKNNRouter(MetaRouter):
 
         perf_scores: Dict[str, float] = {m: 0.0 for m in candidate_models}
         for w, idx in zip(weights, indices):
-            eid = int(self._idx_to_embedding_id_arr[idx])
+            eid            = int(self._idx_to_embedding_id_arr[idx])
             neighbor_perfs = self._perf_lookup.get(eid, {})
             for model in candidate_models:
                 perf_scores[model] += w * neighbor_perfs.get(model, 0.0)
         return perf_scores
 
+    def _knn_perf_scores(
+        self,
+        embedding: np.ndarray,
+        candidate_models: List[str],
+    ) -> Dict[str, float]:
+        """Scores KNN pour un embedding unique."""
+        distances, indices = self.knn_model.kneighbors([embedding])
+        return self._aggregate_knn(distances[0], indices[0], candidate_models)
+
     # ------------------------------------------------------------------ #
-    # Utility scores — uses pre-computed CO₂ norms                       #
+    # Utilité (avec difficulty_weight — doc4)                             #
     # ------------------------------------------------------------------ #
+
     def _compute_utility(
         self,
         perf_scores: Dict[str, float],
         candidate_models: List[str],
+        difficulty: float,
         co2_norm: Optional[Dict[str, float]] = None,
     ) -> Dict[str, float]:
+        """
+        utility(m) = (w_perf · perf(m) - w_co2 · co2_norm(m)) · coeff(m)
+
+        coeff(m) :
+          - petit modèle : 1 + (1 - difficulty) · difficulty_weight
+            → avantagé quand la requête est facile
+          - grand modèle : 1 + difficulty · difficulty_weight
+            → avantagé quand la requête est difficile
+        """
         if co2_norm is None:
             co2_norm = self._co2_norm
-        return {
-            m: self.w_perf * perf_scores[m] - self.w_co2 * co2_norm.get(m, 0.0)
-            for m in candidate_models
-        }
+
+        utility: Dict[str, float] = {}
+        for m in candidate_models:
+            base = self.w_perf * perf_scores[m] - self.w_co2 * co2_norm.get(m, 0.0)
+            if m in self.small_models:
+                coeff = 1.0 + (1.0 - difficulty) * self.difficulty_weight
+            else:
+                coeff = 1.0 + difficulty * self.difficulty_weight
+            utility[m] = base * coeff
+        return utility
+
+    # ------------------------------------------------------------------ #
+    # Web search                                                           #
+    # ------------------------------------------------------------------ #
 
     def _try_web_search(self, query_text: str) -> Optional[Dict[str, Any]]:
         if self.web_searcher is None:
             return None
         result = self.web_searcher.search(query_text)
-        if result:
-            best = result["best"]
-            return {
-                "answer":      best["answer"],
-                "source":      best["source"],
-                "answers":     result["answers"],
-                "tfidf_score": best["score"],
-                "method":      "web_search",
-            }
-        return None
-
-    # ------------------------------------------------------------------ #
-    # Candidate selection depending on difficulty                         #
-    # ------------------------------------------------------------------ #
-    def _select_candidates(self, difficulty: float) -> List[str]:
-        if difficulty < self.threshold and self.small_models:
-            candidates = [m for m in self._candidate_models if m in self.small_models]
-            return candidates if candidates else self._candidate_models
-        return self._candidate_models
+        if not result:
+            return None
+        best = result["best"]
+        return {
+            "answer":      best["answer"],
+            "source":      best["source"],
+            "answers":     result["answers"],
+            "tfidf_score": best["score"],
+        }
 
     # ---------------------------------------------------------------------- #
-    # Public API                                                              #
+    # Interface publique                                                      #
     # ---------------------------------------------------------------------- #
 
     def route_single(self, query: Dict[str, Any]) -> Dict[str, Any]:
-        """Route a single query.  KNN model is already loaded in __init__."""
+        """
+        Route une seule requête.
+
+        Retourne un dict enrichi avec :
+          - model_name, method, difficulty_score, mlp_trained
+          - decision_reason  : explication lisible de la décision
+          - perf_scores, co2_scores, utility_scores
+          - answer, source   : si web_search
+        """
+        total_start = perf_counter()
+        self._log("route_single: start")
+
         query_text = query["query"]
 
-        embedding  = get_longformer_embedding(query_text).numpy()
-        difficulty = self._estimate_difficulty(embedding)
+        # (1) Embedding
+        step = perf_counter()
+        embedding = get_longformer_embedding(query_text).numpy()
+        self._log("route_single: embedding computed", step)
 
-        # ------------------------------------------------------------------
-        # difficulty_score: raw MLP output.
-        # mlp_trained: False when the MLP hasn't been trained yet (output
-        #   will be ~0.5 or saturated).  Callers should not interpret the
-        #   raw score as meaningful in that case.
-        # decision_reason: human-readable explanation of why this branch
-        #   was taken — always consistent with the actual routing decision.
-        # ------------------------------------------------------------------
-        mlp_trained = getattr(self, "_mlp_trained", True)
+        # (2) Difficulté
+        step = perf_counter()
+        difficulty = self._estimate_difficulty(embedding)
+        self._log("route_single: difficulty estimated", step)
 
         output = copy.copy(query)
         output["difficulty_score"]     = difficulty
-        output["mlp_trained"]          = mlp_trained
+        output["mlp_trained"]          = self._mlp_trained
         output["threshold"]            = self.threshold
         output["web_search_threshold"] = self.web_search_threshold
 
-        # — Web search branch —
-        web_triggered = self.use_web_search and difficulty > self.web_search_threshold
-        if web_triggered:
+        # (3) Branche web search
+        if self.use_web_search and difficulty > self.web_search_threshold:
+            step = perf_counter()
             web_result = self._try_web_search(query_text)
+            self._log("route_single: web search done", step)
+
             if web_result:
                 output.update({
-                    "model_name":      "web_search",
-                    "method":          "web_search",
-                    "answer":          web_result["answer"],
-                    "source":          web_result["source"],
-                    "answers":         web_result.get("answers", []),
-                    "tfidf_score":     web_result["tfidf_score"],
-                    "perf_scores":     {},
-                    "co2_scores":      {},
-                    "utility_scores":  {},
+                    "model_name":     "web_search",
+                    "method":         "web_search",
+                    "answer":         web_result["answer"],
+                    "source":         web_result["source"],
+                    "answers":        web_result["answers"],
+                    "tfidf_score":    web_result["tfidf_score"],
+                    "perf_scores":    {},
+                    "co2_scores":     {},
+                    "utility_scores": {},
                     "decision_reason": (
                         f"difficulty {difficulty:.3f} > web_search_threshold "
-                        f"{self.web_search_threshold} → web search succeeded"
+                        f"{self.web_search_threshold} → web search réussi"
                     ),
                 })
+                self._log("route_single: completed (web)", total_start)
                 return output
-            # Web found nothing → fallback small LLM
+
+            # Fallback petit LLM
             fallback = self._get_fallback_small_model()
             output.update({
-                "model_name":      fallback,
-                "method":          "web_fallback_llm",
-                "perf_scores":     {},
-                "co2_scores":      {fallback: self.co2_data.get(fallback, 0.0)},
-                "utility_scores":  {},
+                "model_name":     fallback,
+                "method":         "web_fallback_llm",
+                "perf_scores":    {},
+                "co2_scores":     {fallback: self.co2_data.get(fallback, 0.0)},
+                "utility_scores": {},
                 "decision_reason": (
                     f"difficulty {difficulty:.3f} > web_search_threshold "
-                    f"{self.web_search_threshold} → web search returned nothing "
-                    f"→ fallback to small LLM '{fallback}'"
+                    f"{self.web_search_threshold} → web sans résultat "
+                    f"→ fallback LLM '{fallback}'"
                 ),
             })
+            self._log("route_single: completed (web fallback)", total_start)
             return output
 
-        # — LLM routing branch —
-        candidates     = self._select_candidates(difficulty)
-        co2_norm       = self._build_co2_norm(candidates) if candidates != self._candidate_models else self._co2_norm
+        # (4) Branche LLM routing
+        step = perf_counter()
+        candidates = self._select_candidates(difficulty)
+        co2_norm   = (
+            self._build_co2_norm(candidates)
+            if candidates is not self._candidate_models
+            else self._co2_norm
+        )
+        self._log("route_single: candidates selected", step)
+
+        step = perf_counter()
         perf_scores    = self._knn_perf_scores(embedding, candidates)
-        utility_scores = self._compute_utility(perf_scores, candidates, co2_norm)
+        self._log("route_single: KNN perf scores computed", step)
+
+        step = perf_counter()
+        utility_scores = self._compute_utility(perf_scores, candidates, difficulty, co2_norm)
         best_model     = max(utility_scores, key=utility_scores.__getitem__)
+        self._log("route_single: utility + best model", step)
 
         used_small = candidates is not self._candidate_models
         output.update({
-            "model_name":      best_model,
-            "method":          "llm_routing",
-            "perf_scores":     perf_scores,
-            "co2_scores":      {m: self.co2_data.get(m, 0.0) for m in candidates},
-            "utility_scores":  utility_scores,
+            "model_name":     best_model,
+            "method":         "llm_routing",
+            "perf_scores":    perf_scores,
+            "co2_scores":     {m: self.co2_data.get(m, 0.0) for m in candidates},
+            "utility_scores": utility_scores,
             "decision_reason": (
-                (
-                    f"difficulty {difficulty:.3f} ≤ web_search_threshold "
-                    f"{self.web_search_threshold} → LLM routing"
-                    + (
-                        f" (difficulty {difficulty:.3f} < threshold {self.threshold}"
-                        f" → small-model pool)"
-                        if used_small else
-                        f" (difficulty {difficulty:.3f} ≥ threshold {self.threshold}"
-                        f" → full-model pool)"
-                    )
-                    + f" → best utility: '{best_model}'"
+                f"difficulty {difficulty:.3f} ≤ web_search_threshold "
+                f"{self.web_search_threshold} → LLM routing"
+                + (
+                    f" (difficulty < threshold {self.threshold} → pool petits modèles)"
+                    if used_small else
+                    f" (difficulty ≥ threshold {self.threshold} → pool complet)"
                 )
+                + f" → meilleure utilité : '{best_model}'"
             ),
         })
+        self._log("route_single: completed (LLM)", total_start)
         return output
 
     # ------------------------------------------------------------------ #
-    # Async helper for concurrent API calls                               #
+    # Async API call                                                       #
     # ------------------------------------------------------------------ #
 
     async def _call_api_async(
         self,
-        session: Any,  # aiohttp.ClientSession ou None
+        session: Any,
         request: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """
-        Appel API asynchrone (aiohttp) avec fallback synchrone (call_api).
-        Si aiohttp n'est pas installé, tourne en mode synchrone.
-        """
+        """Appel API asynchrone (aiohttp) avec fallback synchrone."""
         if not _AIOHTTP_AVAILABLE or session is None:
-            # Fallback synchrone
             try:
                 result = call_api(request, max_tokens=1024, temperature=0.7)
                 return {
@@ -570,7 +627,7 @@ class GreenKNNRouter(MetaRouter):
                     "completion_tokens": result.get("completion_tokens", 0),
                 }
             except Exception as e:
-                print(f"❌ Sync API error: {e}")
+                print(f"❌ Erreur API sync : {e}")
                 return {"response": "", "prompt_tokens": 0, "completion_tokens": 0, "error": str(e)}
 
         try:
@@ -585,17 +642,20 @@ class GreenKNNRouter(MetaRouter):
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=60),
             ) as resp:
-                data     = await resp.json()
-                response = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                usage    = data.get("usage", {})
+                data  = await resp.json()
+                usage = data.get("usage", {})
                 return {
-                    "response":          response,
+                    "response":          data.get("choices", [{}])[0].get("message", {}).get("content", ""),
                     "prompt_tokens":     usage.get("prompt_tokens", 0),
                     "completion_tokens": usage.get("completion_tokens", 0),
                 }
         except Exception as e:
-            print(f"❌ Async API error: {e}")
+            print(f"❌ Erreur API async : {e}")
             return {"response": "", "prompt_tokens": 0, "completion_tokens": 0, "error": str(e)}
+
+    # ------------------------------------------------------------------ #
+    # Assemblage des résultats (appelé depuis route_batch)                #
+    # ------------------------------------------------------------------ #
 
     async def _route_batch_async(
         self,
@@ -604,28 +664,24 @@ class GreenKNNRouter(MetaRouter):
         task_name: Optional[str],
     ) -> List[Dict[str, Any]]:
         """
-        Given pre-computed routing decisions, fire all LLM API calls
-        concurrently and return the enriched row dicts.
+        Lance tous les appels LLM en parallèle, assemble les résultats.
+        Les lignes web_search sont retournées directement sans appel API.
         """
         results: List[Dict[str, Any]] = []
-
-        # Ouvre une session aiohttp si disponible, sinon None (fallback sync)
         session = aiohttp.ClientSession() if _AIOHTTP_AVAILABLE else None
+
         try:
-            tasks = []
-            meta  = []  # parallel metadata for result assembly
+            tasks: List[Any] = []
 
             for row_copy, routing_result in zip(rows, routing_results):
                 method     = routing_result.get("method", "llm_routing")
                 best_model = routing_result.get("model_name", "")
 
                 if method == "web_search":
-                    # No API call needed — answer already in routing_result.
                     tasks.append(None)
-                    meta.append(None)
                     continue
 
-                # Format prompt
+                # Formatage du prompt
                 original_query = row_copy.get("query", "")
                 row_task_name  = row_copy.get("task_name", task_name)
                 if row_task_name:
@@ -635,66 +691,59 @@ class GreenKNNRouter(MetaRouter):
                             {"query": original_query, "choices": row_copy.get("choices")},
                         )
                     except (ValueError, KeyError) as e:
-                        print(f"⚠️  Formatting failed ({e}); using raw query.")
+                        print(f"⚠️  Formatage échoué ({e}) — requête brute utilisée.")
                         formatted = original_query
                 else:
                     formatted = original_query
-
                 row_copy["formatted_query"] = formatted
 
+                # Résolution endpoint
                 api_model_name = best_model
                 api_endpoint   = None
                 service        = None
-
                 if self.llm_data and best_model in self.llm_data:
                     api_model_name = self.llm_data[best_model].get("model", best_model)
                     api_endpoint   = self.llm_data[best_model].get("api_endpoint")
                     service        = self.llm_data[best_model].get("service")
-
                 if api_endpoint is None:
                     api_endpoint = self.cfg.get("api_endpoint")
-
                 if not api_endpoint:
                     raise ValueError(
-                        f"No API endpoint for '{best_model}'. "
-                        "Check 'api_endpoint' in llm_data or YAML."
+                        f"Endpoint API introuvable pour '{best_model}'. "
+                        "Vérifiez 'api_endpoint' dans llm_data ou le YAML."
                     )
 
-                request = {
+                req = {
                     "api_endpoint": api_endpoint,
                     "query":        formatted,
                     "model_name":   best_model,
                     "api_name":     api_model_name,
                 }
                 if service:
-                    request["service"] = service
+                    req["service"] = service
 
-                tasks.append(asyncio.ensure_future(self._call_api_async(session, request)))
-                meta.append(row_copy.get("task_name", task_name))
+                tasks.append(asyncio.ensure_future(self._call_api_async(session, req)))
 
-            # Gather all outstanding coroutines concurrently
-            task_futures = [t for t in tasks if t is not None]
-            task_results = await asyncio.gather(*task_futures, return_exceptions=True)
+            # Attente parallèle
+            api_futures = [t for t in tasks if t is not None]
+            api_results = await asyncio.gather(*api_futures, return_exceptions=True)
+            result_iter = iter(api_results)
 
-            # Reassemble — match task_results back to the rows that submitted them
-            result_iter = iter(task_results)
             for row_copy, routing_result, t in zip(rows, routing_results, tasks):
-                row_copy.update({
-                    k: v for k, v in routing_result.items() if k != "query"
-                })
+                row_copy.update({k: v for k, v in routing_result.items() if k != "query"})
                 method = routing_result.get("method", "llm_routing")
 
                 if method == "web_search":
-                    row_copy["response"]          = routing_result.get("answer", "")
-                    row_copy["success"]            = True
-                    row_copy["prompt_tokens"]      = 0
-                    row_copy["completion_tokens"]  = 0
+                    row_copy["response"]         = routing_result.get("answer", "")
+                    row_copy["success"]           = True
+                    row_copy["prompt_tokens"]     = 0
+                    row_copy["completion_tokens"] = 0
                     results.append(row_copy)
                     continue
 
                 api_result = next(result_iter)
                 if isinstance(api_result, Exception):
-                    print(f"❌ API error: {api_result}")
+                    print(f"❌ Erreur API : {api_result}")
                     response, pt, ct, success = "", 0, 0, False
                 else:
                     response = api_result.get("response", "")
@@ -735,7 +784,7 @@ class GreenKNNRouter(MetaRouter):
         return results
 
     # ------------------------------------------------------------------ #
-    # route_batch — batch embeddings + batch KNN + async API calls        #
+    # route_batch                                                          #
     # ------------------------------------------------------------------ #
 
     def route_batch(
@@ -744,100 +793,99 @@ class GreenKNNRouter(MetaRouter):
         task_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Route a batch of queries.
+        Route un lot de requêtes.
 
-        Optimisation summary:
-        - All Longformer embeddings computed in a single batched forward pass.
-        - All MLP difficulty scores computed in a single batched forward pass.
-        - A single kneighbors() call covers the whole non-web subset.
-        - All LLM API requests fired concurrently via asyncio + aiohttp.
+        Optimisations :
+        - Embeddings Longformer en un seul forward pass (batch).
+        - Scores MLP en un seul forward pass (batch).
+        - kneighbors() appelé une seule fois pour tout le sous-ensemble LLM.
+        - Appels API LLM lancés en parallèle (asyncio + aiohttp).
         """
+        batch_start = perf_counter()
+        self._log("route_batch: start")
+
         if batch is not None:
             query_data = batch if isinstance(batch, list) else [batch]
         elif hasattr(self, "query_data_test") and self.query_data_test is not None:
             query_data = copy.copy(self.query_data_test)
         else:
-            print("⚠️  No data provided for batch routing.")
+            print("⚠️  Aucune donnée fournie pour le routage par lot.")
             return []
 
-        # Normalise rows to dicts
-        rows: List[Dict[str, Any]] = []
-        for row in query_data:
-            if isinstance(row, dict):
-                rows.append(copy.copy(row))
-            else:
-                rows.append({"query": str(row)})
-
+        rows: List[Dict[str, Any]] = [
+            copy.copy(row) if isinstance(row, dict) else {"query": str(row)}
+            for row in query_data
+        ]
         queries = [r.get("query", "") for r in rows]
 
         # ---- 1. Batch embeddings ---------------------------------------- #
-        # If get_longformer_embeddings_batch is available use it; otherwise
-        # fall back to sequential calls (still avoids the reload penalty).
-        try:
-            embeddings = get_longformer_embeddings_batch(queries)  # (N, D) numpy
-        except (AttributeError, TypeError):
-            embeddings = np.stack([
-                get_longformer_embedding(q).numpy() for q in queries
-            ])
+        step = perf_counter()
+        if _BATCH_EMBED_AVAILABLE:
+            try:
+                embeddings = get_longformer_embeddings_batch(queries)
+            except Exception:
+                embeddings = np.stack([get_longformer_embedding(q).numpy() for q in queries])
+        else:
+            embeddings = np.stack([get_longformer_embedding(q).numpy() for q in queries])
+        self._log("route_batch: embeddings computed", step)
 
-        # ---- 2. Batch difficulty estimation ------------------------------ #
-        difficulties = self._estimate_difficulty_batch(embeddings)  # (N,)
+        # ---- 2. Batch difficulty ----------------------------------------- #
+        step = perf_counter()
+        difficulties = self._estimate_difficulty_batch(embeddings)
+        self._log("route_batch: difficulties estimated", step)
 
-        # ---- 3. Partition: web vs LLM ------------------------------------ #
-        web_mask = (
-            self.use_web_search
-            and (difficulties > self.web_search_threshold)
-        )
-        if not isinstance(web_mask, np.ndarray):
-            web_mask = np.array([web_mask] * len(rows))
+        # ---- 3. Partition web / LLM -------------------------------------- #
+        if self.use_web_search:
+            web_mask = difficulties > self.web_search_threshold
+        else:
+            web_mask = np.zeros(len(rows), dtype=bool)
 
         llm_indices = [i for i in range(len(rows)) if not web_mask[i]]
         web_indices = [i for i in range(len(rows)) if web_mask[i]]
 
-        # ---- 4. Batch KNN for LLM rows ---------------------------------- #
-        # We route per-difficulty (small vs full model set); group by candidate set.
         routing_results: List[Optional[Dict[str, Any]]] = [None] * len(rows)
 
+        # ---- 4. Batch KNN pour les lignes LLM --------------------------- #
         if llm_indices:
+            step = perf_counter()
             llm_embeddings = embeddings[llm_indices]
 
-            # Determine candidate set per row; group by (use_small: bool)
             use_small = [
                 difficulties[i] < self.threshold and bool(self.small_models)
                 for i in llm_indices
             ]
-
-            # Compute full-set candidates once; small-set once (if needed).
             full_candidates  = self._candidate_models
             small_candidates = (
-                [m for m in full_candidates if m in self.small_models] or full_candidates
-            ) if any(use_small) else []
-
-            full_co2_norm  = self._co2_norm
-            small_co2_norm = (
-                self._build_co2_norm(small_candidates) if small_candidates else {}
+                ([m for m in full_candidates if m in self.small_models] or full_candidates)
+                if any(use_small) else []
             )
+            full_co2_norm  = self._co2_norm
+            small_co2_norm = self._build_co2_norm(small_candidates) if small_candidates else {}
 
-            # One kneighbors call for the whole LLM subset.
             distances_batch, indices_batch = self.knn_model.kneighbors(llm_embeddings)
+            self._log("route_batch: batch KNN done", step)
 
+            step = perf_counter()
             for rank, i in enumerate(llm_indices):
+                diff       = float(difficulties[i])
                 candidates = (
                     small_candidates if use_small[rank] and small_candidates
                     else full_candidates
                 )
-                co2_norm   = small_co2_norm if use_small[rank] and small_candidates else full_co2_norm
-
+                co2_norm   = (
+                    small_co2_norm if use_small[rank] and small_candidates
+                    else full_co2_norm
+                )
                 perf_scores    = self._aggregate_knn(
                     distances_batch[rank], indices_batch[rank], candidates
                 )
-                utility_scores = self._compute_utility(perf_scores, candidates, co2_norm)
+                utility_scores = self._compute_utility(perf_scores, candidates, diff, co2_norm)
                 best_model     = max(utility_scores, key=utility_scores.__getitem__)
+                used_small     = candidates is not full_candidates
 
-                used_small_pool = candidates is not full_candidates
                 routing_results[i] = {
                     "query":                queries[i],
-                    "difficulty_score":     float(difficulties[i]),
+                    "difficulty_score":     diff,
                     "mlp_trained":          self._mlp_trained,
                     "threshold":            self.threshold,
                     "web_search_threshold": self.web_search_threshold,
@@ -847,73 +895,80 @@ class GreenKNNRouter(MetaRouter):
                     "co2_scores":           {m: self.co2_data.get(m, 0.0) for m in candidates},
                     "utility_scores":       utility_scores,
                     "decision_reason": (
-                        f"difficulty {float(difficulties[i]):.3f} ≤ web_search_threshold "
+                        f"difficulty {diff:.3f} ≤ web_search_threshold "
                         f"{self.web_search_threshold} → LLM routing"
                         + (
-                            f" (difficulty < threshold {self.threshold} → small-model pool)"
-                            if used_small_pool else
-                            f" (difficulty ≥ threshold {self.threshold} → full-model pool)"
+                            f" (difficulty < threshold {self.threshold} → pool petits modèles)"
+                            if used_small else
+                            f" (difficulty ≥ threshold {self.threshold} → pool complet)"
                         )
-                        + f" → best utility: '{best_model}'"
+                        + f" → meilleure utilité : '{best_model}'"
                     ),
                 }
+            self._log("route_batch: LLM routing decisions done", step)
 
-        # ---- 5. Web search rows (sequential — network-bound) ------------ #
-        for i in web_indices:
-            web_result = self._try_web_search(queries[i])
-            if web_result:
-                routing_results[i] = {
-                    "query":                queries[i],
-                    "difficulty_score":     float(difficulties[i]),
-                    "mlp_trained":          self._mlp_trained,
-                    "threshold":            self.threshold,
-                    "web_search_threshold": self.web_search_threshold,
-                    "model_name":           "web_search",
-                    "method":               "web_search",
-                    "answer":               web_result["answer"],
-                    "source":               web_result["source"],
-                    "answers":              web_result.get("answers", []),
-                    "tfidf_score":          web_result["tfidf_score"],
-                    "perf_scores":          {},
-                    "co2_scores":           {},
-                    "utility_scores":       {},
-                    "decision_reason": (
-                        f"difficulty {float(difficulties[i]):.3f} > web_search_threshold "
-                        f"{self.web_search_threshold} → web search succeeded"
-                    ),
-                }
-            else:
-                fallback = self._get_fallback_small_model()
-                routing_results[i] = {
-                    "query":                queries[i],
-                    "difficulty_score":     float(difficulties[i]),
-                    "mlp_trained":          self._mlp_trained,
-                    "threshold":            self.threshold,
-                    "web_search_threshold": self.web_search_threshold,
-                    "model_name":           fallback,
-                    "method":               "web_fallback_llm",
-                    "perf_scores":          {},
-                    "co2_scores":           {fallback: self.co2_data.get(fallback, 0.0)},
-                    "utility_scores":       {},
-                    "decision_reason": (
-                        f"difficulty {float(difficulties[i]):.3f} > web_search_threshold "
-                        f"{self.web_search_threshold} → web search returned nothing "
-                        f"→ fallback to small LLM '{fallback}'"
-                    ),
-                }
+        # ---- 5. Web search (séquentiel — réseau) ------------------------- #
+        if web_indices:
+            step = perf_counter()
+            for i in web_indices:
+                diff       = float(difficulties[i])
+                web_result = self._try_web_search(queries[i])
+                if web_result:
+                    routing_results[i] = {
+                        "query":                queries[i],
+                        "difficulty_score":     diff,
+                        "mlp_trained":          self._mlp_trained,
+                        "threshold":            self.threshold,
+                        "web_search_threshold": self.web_search_threshold,
+                        "model_name":           "web_search",
+                        "method":               "web_search",
+                        "answer":               web_result["answer"],
+                        "source":               web_result["source"],
+                        "answers":              web_result["answers"],
+                        "tfidf_score":          web_result["tfidf_score"],
+                        "perf_scores":          {},
+                        "co2_scores":           {},
+                        "utility_scores":       {},
+                        "decision_reason": (
+                            f"difficulty {diff:.3f} > web_search_threshold "
+                            f"{self.web_search_threshold} → web search réussi"
+                        ),
+                    }
+                else:
+                    fallback = self._get_fallback_small_model()
+                    routing_results[i] = {
+                        "query":                queries[i],
+                        "difficulty_score":     diff,
+                        "mlp_trained":          self._mlp_trained,
+                        "threshold":            self.threshold,
+                        "web_search_threshold": self.web_search_threshold,
+                        "model_name":           fallback,
+                        "method":               "web_fallback_llm",
+                        "perf_scores":          {},
+                        "co2_scores":           {fallback: self.co2_data.get(fallback, 0.0)},
+                        "utility_scores":       {},
+                        "decision_reason": (
+                            f"difficulty {diff:.3f} > web_search_threshold "
+                            f"{self.web_search_threshold} → web sans résultat "
+                            f"→ fallback LLM '{fallback}'"
+                        ),
+                    }
+            self._log("route_batch: web search done", step)
 
-        # ---- 6. Concurrent LLM API calls -------------------------------- #
+        # ---- 6. Appels API en parallèle ---------------------------------- #
+        step = perf_counter()
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # Already inside an event loop (e.g. Jupyter).
                 import nest_asyncio
                 nest_asyncio.apply()
-            return loop.run_until_complete(
+            result = loop.run_until_complete(
                 self._route_batch_async(rows, routing_results, task_name)
             )
         except RuntimeError:
-            # No running loop.
-            return asyncio.run(
+            result = asyncio.run(
                 self._route_batch_async(rows, routing_results, task_name)
             )
+        self._log("route_batch: API calls done", step)
+        self._log("route_batch: completed", batch_start)
+        return result
