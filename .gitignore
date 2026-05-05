@@ -44,8 +44,8 @@ Router/env/
 Thumbs.db
 
 # Repository-level model artifacts
-saved_models/
 Router/saved_models/
+Router/llmrouter/saved_models/
 
 # Router data and generated outputs
 Router/*.csv
