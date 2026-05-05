@@ -2,6 +2,7 @@
 Utils package for LLMRouter scripts
 """
 
+from .embedding import get_longformer_embeddings_batch
 from .data_loader import (
     load_csv,
     load_jsonl,
