@@ -1,0 +1,174 @@
+.reports-list__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 1rem;
+}
+
+.reports-list__card {
+  background: #ffffff;
+  border-radius: 1rem;
+  padding: 0.5rem 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.reports-list__row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.reports-list__row:last-child {
+  border-bottom: none;
+}
+
+.reports-list__icon-wrap {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  color: #a3e635;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.reports-list__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.reports-list__col--name {
+  flex: 2;
+}
+
+.reports-list__primary {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reports-list__secondary {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reports-list__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.reports-list__btn {
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid;
+  background: transparent;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.reports-list__btn--details {
+  border-color: #0f172a;
+  color: #0f172a;
+}
+
+.reports-list__btn--details:hover {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.reports-list__btn--export {
+  border-color: #a3e635;
+  color: #a3e635;
+}
+
+.reports-list__btn--export:hover {
+  background: #a3e635;
+  color: #0f172a;
+}
+
+/* Dialog */
+.report-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.report-dialog__icon-wrap {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  background: #0f172a;
+  color: #a3e635;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.report-dialog__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.report-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.25rem 0;
+}
+
+.report-dialog__description {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.report-dialog__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  background: #f8fafc;
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.report-dialog__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.report-dialog__item-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.report-dialog__item-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+}

@@ -402,3 +402,54 @@ export async function getTeamsAndMembers() {
     members: ['Jaime Rey', 'Ewan McGregor', 'Martin Vasquez', 'Liam LeGoat', 'Josue Vega', 'Sofia Reyes', 'Noah Petit', 'Amira Osei'],
   }
 }
+
+//------------------------reports page data ------------------------------
+
+export async function getReports() {
+  return [
+    {
+      id: 1,
+      name: 'Business Report',
+      description: 'Overview of all AI-related business expenses and usage.',
+      generatedBy: 'Jaime Rey',
+      frequency: 'Monthly',
+      lastGenerated: '01 May 2026',
+      icon: 'pi pi-dollar',
+      details:
+        'This report provides a full breakdown of AI spending across all departments, including cost per model, cost per team, and monthly trends. Ideal for finance and executive review.',
+    },
+    {
+      id: 2,
+      name: 'Team Report',
+      description: 'AI usage and costs broken down by team.',
+      generatedBy: 'Sofia Reyes',
+      frequency: 'Weekly',
+      lastGenerated: '28 Apr 2026',
+      icon: 'pi pi-users',
+      details:
+        'Breaks down AI usage per team, showing which departments consume the most tokens, their associated costs, and how they track against their allocated budgets.',
+    },
+    {
+      id: 3,
+      name: 'CO2 Savings Report',
+      description: 'Carbon savings achieved through optimized AI routing.',
+      generatedBy: 'Martin Vasquez',
+      frequency: 'Monthly',
+      lastGenerated: '01 May 2026',
+      icon: 'pi pi-chart-line',
+      details:
+        'Tracks CO2 emissions saved by routing requests to more energy-efficient models. Includes baseline vs actual emissions, reduction percentage, and top contributing teams.',
+    },
+    {
+      id: 4,
+      name: 'Usage Report',
+      description: 'Detailed log of all AI model requests and token usage.',
+      generatedBy: 'Amira Osei',
+      frequency: 'On-demand',
+      lastGenerated: '30 Apr 2026',
+      icon: 'pi pi-list',
+      details:
+        'A granular log of every AI request made across the platform. Includes model used, token count, cost per request, user, and timestamp. Useful for auditing and optimization.',
+    },
+  ]
+}
