@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional
+import traceback
 import pandas as pd
 import torch
 import json
@@ -38,20 +39,26 @@ def jsonl_to_csv(jsonl_path: str, csv_path: Optional[str] = None) -> Optional[pd
     If `csv_path` is not provided, the CSV will be saved in the same directory as the JSONL.
     """
     if not os.path.exists(jsonl_path):
+        print(f"[UTILS-DEBUG] jsonl_to_csv missing path: {jsonl_path}", flush=True)
         return None
 
     try:
-        with open(jsonl_path, "r", encoding="utf-8") as f:
-            data = [json.loads(line) for line in f]
-
-        df = pd.DataFrame(data)
+        print(f"[UTILS-DEBUG] jsonl_to_csv reading: {jsonl_path}", flush=True)
+        # Use pandas JSONL reader directly to avoid building a huge intermediate
+        # Python list of dicts, which can spike memory usage.
+        df = pd.read_json(jsonl_path, lines=True)
+        print(f"[UTILS-DEBUG] jsonl_to_csv dataframe shape={df.shape}", flush=True)
 
         if csv_path is None:
             csv_path = os.path.splitext(jsonl_path)[0] + ".csv"
 
+        print(f"[UTILS-DEBUG] jsonl_to_csv writing csv: {csv_path}", flush=True)
         df.to_csv(csv_path, index=False, encoding="utf-8")
+        print("[UTILS-DEBUG] jsonl_to_csv done", flush=True)
         return df
     except Exception:
+        print("[UTILS-DEBUG] jsonl_to_csv failed with traceback:", flush=True)
+        traceback.print_exc()
         return None
 
 
