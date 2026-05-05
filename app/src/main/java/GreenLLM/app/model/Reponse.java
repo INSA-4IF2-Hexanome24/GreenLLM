@@ -5,6 +5,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.ManyToOne;
+
 
 @Entity
 @Table(name = "reponse")
@@ -13,6 +15,9 @@ public class Reponse {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne
+    private ModelLLM modelUtilise; 
 
     private String description;
     private int nombreTokens;
@@ -37,6 +42,10 @@ public class Reponse {
         this.id = id;
     }
 
+    public void setModelUtlise(ModelLLM model) {
+        this.modelUtilise = model;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -52,4 +61,10 @@ public class Reponse {
     public void setNombreTokens(int nombreTokens) {
         this.nombreTokens = nombreTokens;
     }
+
+    public ModelLLM getModelUtilise(){
+        return this.modelUtilise;
+    }
+
+    
 }
