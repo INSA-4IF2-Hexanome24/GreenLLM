@@ -1,15 +1,42 @@
-// src/stores/auth.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+
+export type UserRole = 'admin' | 'employee'
 
 interface User {
   name: string
   username: string
   email: string
-  role: string
+  role: UserRole
   city: string
   country: string
   avatar?: string
+}
+
+// Fake users for demo
+const FAKE_USERS: Record<string, { password: string; profile: User }> = {
+  ewan: {
+    password: 'admin',
+    profile: {
+      name: 'Ewan',
+      username: 'ewan',
+      email: 'ewan@greenllm.com',
+      role: 'admin',
+      city: 'Paris',
+      country: 'France',
+    },
+  },
+  jaime: {
+    password: 'emp',
+    profile: {
+      name: 'Jaime Rey',
+      username: 'jaime',
+      email: 'jaime@greenllm.com',
+      role: 'employee',
+      city: 'San Jose',
+      country: 'USA',
+    },
+  },
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -17,31 +44,20 @@ export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<User | null>(null)
 
   function login(username: string, password: string): boolean {
-    if (username === 'ewan' && password === 'admin') {
+    const match = FAKE_USERS[username]
+    if (match && match.password === password) {
       isAuthenticated.value = true
-      currentUser.value = {
-        name: 'Ewan',
-        username,
-        email: '',
-        role: '',
-        city: '',
-        country: '',
-      }
+      currentUser.value = match.profile
       return true
     }
     return false
   }
 
-  function register(userData: Omit<User, 'avatar'> & { password: string }): boolean {
-    // Mock registration — replace with API call later
+  function register(userData: Omit<User, 'role'> & { password: string }): boolean {
     isAuthenticated.value = true
     currentUser.value = {
-      name: userData.name,
-      username: userData.username,
-      email: userData.email,
-      role: userData.role,
-      city: userData.city,
-      country: userData.country,
+      ...userData,
+      role: 'employee', // new registrations are employees by default
     }
     return true
   }

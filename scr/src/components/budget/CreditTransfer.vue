@@ -46,4 +46,4 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped src="@/assets/dashboard/CreditTransfer.css" />
+<style scoped src="@/assets/budget/CreditTransfer.css" />

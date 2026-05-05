@@ -1,0 +1,26 @@
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.overview-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.overview-subtitle {
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+  color: #64748b;
+}
+
+.overview-budget {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.overview-expense {
+  color: #16a34a;
+}

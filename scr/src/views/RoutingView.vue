@@ -1,8 +1,6 @@
 ﻿<template>
   <div class="routing">
-    <!-- Input Card -->
     <div class="routing-card">
-      <!-- Tabs -->
       <div class="routing-tabs">
         <button
           :class="['routing-tab', { 'routing-tab--active': mode === 'router' }]"
@@ -16,7 +14,6 @@
         >
           CHAT MODE
         </button>
-
         <div class="routing-quota">
           <span>Quota remaining: {{ quota.remaining.toLocaleString() }}</span>
           <i class="pi pi-circle-fill routing-quota__dot" />
@@ -25,7 +22,6 @@
 
       <Divider class="routing-divider" />
 
-      <!-- Prompt textarea -->
       <Textarea
         v-model="prompt"
         :placeholder="
@@ -38,7 +34,6 @@
         rows="5"
       />
 
-      <!-- Bottom bar -->
       <div class="routing-bar">
         <div class="routing-bar__left">
           <span class="routing-mode-badge">
@@ -54,9 +49,7 @@
           />
         </div>
         <div class="routing-bar__right">
-          <span class="routing-char-count">
-            {{ prompt.length }} / 5000
-          </span>
+          <span class="routing-char-count">{{ prompt.length }} / 5000</span>
           <Button
             label="Choose Model"
             class="routing-submit-btn"
@@ -68,17 +61,10 @@
       </div>
     </div>
 
-    <!-- Results -->
     <div v-if="models.length > 0" class="routing-results">
       <h2 class="routing-results__title">Results</h2>
-
       <div class="routing-results__list">
-        <div
-          v-for="model in models"
-          :key="model.id"
-          class="model-card"
-        >
-          <!-- Icon + Name -->
+        <div v-for="model in models" :key="model.id" class="model-card">
           <div class="model-card__identity">
             <img
               :src="model.icon"
@@ -91,13 +77,10 @@
               <span class="model-card__tag">{{ model.tag }}</span>
             </div>
           </div>
-
-          <!-- Stats -->
           <div class="model-card__stat">
             <span class="model-card__stat-label">CO2</span>
             <span class="model-card__stat-value">{{ model.co2 }}kg</span>
           </div>
-
           <div class="model-card__stat">
             <span class="model-card__stat-label">Power</span>
             <span
@@ -105,19 +88,14 @@
                 'model-card__stat-value',
                 `model-card__stat-value--${model.power.toLowerCase()}`,
               ]"
-            >
-              {{ model.power }}
-            </span>
+            >{{ model.power }}</span>
           </div>
-
           <div class="model-card__stat">
             <span class="model-card__stat-label">Cost</span>
             <span class="model-card__stat-value model-card__stat-value--cost">
               {{ model.cost }}$
             </span>
           </div>
-
-          <!-- Use button -->
           <Button
             label="Use"
             outlined
@@ -130,7 +108,6 @@
       </div>
     </div>
 
-    <!-- Response Toast -->
     <Toast />
   </div>
 </template>
@@ -142,14 +119,11 @@ import Divider from 'primevue/divider'
 import Textarea from 'primevue/textarea'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
-import {
-  getModels,
-  getQuota,
-  submitPrompt,
-  useModel,
-} from '@/services/routingService'
+import { getQuota, submitPrompt, useModel } from '@/services/routingService'
+import { useRoutingStore } from '@/stores/routing'
 
 const toast = useToast()
+const routingStore = useRoutingStore()
 
 const mode = ref<'router' | 'chat'>('router')
 const prompt = ref('')
@@ -160,6 +134,13 @@ const quota = ref({ remaining: 10000, total: 10000 })
 
 onMounted(async () => {
   quota.value = await getQuota()
+
+  // If coming from the widget, pick up the prompt and auto-submit
+  if (routingStore.pendingPrompt) {
+    prompt.value = routingStore.pendingPrompt
+    routingStore.clearPrompt()
+    await handleSubmit()
+  }
 })
 
 async function handleSubmit() {
@@ -173,7 +154,6 @@ async function handleUseModel(model: any) {
   usingModelId.value = model.id
   const result = await useModel(model.id, prompt.value)
   usingModelId.value = null
-
   if (result.success) {
     toast.add({
       severity: 'success',

@@ -1,15 +1,13 @@
 <template>
   <aside class="sidebar">
-    <!-- Logo -->
     <div class="sidebar__logo">
       <img src="/logo.png" alt="GreenLLM" class="sidebar__logo-img" />
       <span class="sidebar__logo-text">GreenLLM</span>
     </div>
 
-    <!-- Nav Items -->
     <nav class="sidebar__nav">
       <RouterLink
-        v-for="item in navItems"
+        v-for="item in visibleNavItems"
         :key="item.path"
         :to="item.path"
         class="sidebar__item"
@@ -23,20 +21,28 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 
-const navItems = [
-  { label: 'Dashboard', icon: 'pi pi-home', path: '/user/dashboard' },
-  { label: 'Routing', icon: 'pi pi-map', path: '/user/routing' },
-  { label: 'Accounts', icon: 'pi pi-user', path: '/user/accounts' },
-  { label: 'Budget', icon: 'pi pi-wallet', path: '/user/budget' },
-  { label: 'Reports', icon: 'pi pi-chart-bar', path: '/user/reports' },
-  { label: 'Carbon', icon: 'pi pi-globe', path: '/user/carbon' },
-  { label: 'Models', icon: 'pi pi-wrench', path: '/user/models' },
-  { label: 'Settings', icon: 'pi pi-cog', path: '/user/settings' },
+const allNavItems = [
+  { label: 'Dashboard', icon: 'pi pi-home',      path: '/user/dashboard', roles: ['admin', 'employee'] },
+  { label: 'Routing',   icon: 'pi pi-map',        path: '/user/routing',   roles: ['admin', 'employee'] },
+  { label: 'Accounts',  icon: 'pi pi-user',       path: '/user/accounts',  roles: ['admin'] },
+  { label: 'Budget',    icon: 'pi pi-wallet',     path: '/user/budget',    roles: ['admin'] },
+  { label: 'Reports',   icon: 'pi pi-chart-bar',  path: '/user/reports',   roles: ['admin'] },
+  { label: 'Carbon',    icon: 'pi pi-globe',      path: '/user/carbon',    roles: ['admin', 'employee'] },
+  { label: 'Models',    icon: 'pi pi-wrench',     path: '/user/models',    roles: ['admin', 'employee'] },
+  { label: 'Settings',  icon: 'pi pi-cog',        path: '/user/settings',  roles: ['admin', 'employee'] },
 ]
+
+const visibleNavItems = computed(() => {
+  const role = auth.currentUser?.role ?? 'employee'
+  return allNavItems.filter((item) => item.roles.includes(role))
+})
 
 function isActive(path: string) {
   return route.path === path
