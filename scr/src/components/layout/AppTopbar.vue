@@ -52,7 +52,7 @@
 
       <!-- Avatar -->
       <Avatar
-        image="https://i.pravatar.cc/150?img=5"
+        image="/ProfilePic.png"
         shape="circle"
         size="normal"
         class="topbar__avatar"
