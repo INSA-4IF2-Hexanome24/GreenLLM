@@ -49,6 +49,10 @@ public class Reponse {
         this.modelUtilise = model;
     }
 
+    public void setModelUtilise(ModelLLM model) {
+        this.modelUtilise = model;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -68,6 +72,4 @@ public class Reponse {
     public ModelLLM getModelUtilise(){
         return this.modelUtilise;
     }
-
-    
 }

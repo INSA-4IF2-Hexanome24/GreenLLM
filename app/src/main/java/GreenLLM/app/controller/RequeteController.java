@@ -34,7 +34,7 @@ public class RequeteController {
         Requete requete = new Requete(
                 request.getDescription(),
                 utilisateur,
-                request.getNombreTokens());
+                0);
 
         Requete savedRequete = requeteRepository.save(requete);
 

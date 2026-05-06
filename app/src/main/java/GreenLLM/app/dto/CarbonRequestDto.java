@@ -1,19 +1,19 @@
 package GreenLLM.app.dto;
 
-public class RequeteCreateRequest {
+public class CarbonRequestDto {
 
-    private String description;
+    private String query;
     private Long utilisateurId;
 
-    public RequeteCreateRequest() {
+    public CarbonRequestDto() {
     }
 
-    public String getDescription() {
-        return description;
+    public String getQuery() {
+        return query;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
+    public void setQuery(String query) {
+        this.query = query;
     }
 
     public Long getUtilisateurId() {
