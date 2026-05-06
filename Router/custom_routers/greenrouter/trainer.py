@@ -153,13 +153,13 @@ class GreenKNNRouterTrainer(BaseTrainer):
 
             # Perf élevée = requête facile (tous les modèles y arrivent)
             # Perf faible = requête difficile (les modèles ont du mal)
-            label = 0.0 if mean_perf >= difficulty_threshold else 1.0
+            label = 1 - mean_perf 
 
             embeddings.append(embedding)
             labels.append(label)
 
-        n_easy = sum(1 for l in labels if l == 0.0)
-        n_hard = sum(1 for l in labels if l == 1.0)
+        n_easy = sum(1 for l in labels if l <= 0.5)
+        n_hard = sum(1 for l in labels if l > 0.5)
         print(f"📊 Données de difficulté (seuil perf={difficulty_threshold}) :")
         print(f"   Faciles (label=0) : {n_easy}")
         print(f"   Difficiles (label=1) : {n_hard}")
