@@ -16,6 +16,7 @@ Entraîne les deux composants du GreenKNNRouter :
 """
 
 import os
+import traceback
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -87,11 +88,12 @@ class GreenKNNRouterTrainer(BaseTrainer):
         # Fonction de perte (classification binaire facile/difficile)
         self.criterion = nn.BCELoss()
 
-        print("✅ GreenKNNRouterTrainer initialisé.")
-        print(f"   Device         : {device}")
-        print(f"   Learning rate  : {self.learning_rate}")
-        print(f"   Époques        : {self.num_epochs}")
-        print(f"   Batch size     : {self.batch_size}")
+        print("✅ GreenKNNRouterTrainer initialisé.", flush=True)
+        print(f"   Device         : {device}", flush=True)
+        print(f"   Learning rate  : {self.learning_rate}", flush=True)
+        print(f"   Époques        : {self.num_epochs}", flush=True)
+        print(f"   Batch size     : {self.batch_size}", flush=True)
+        print("[GREEN-TRAIN-DEBUG] __init__ done", flush=True)
 
     # ------------------------------------------------------------------
     # Préparation des données
@@ -116,36 +118,48 @@ class GreenKNNRouterTrainer(BaseTrainer):
         labels: List[float] = []
 
         # Calculer la performance moyenne par requête sur TOUS les modèles
-        perf_by_query = (
-            self.router.routing_data_train
-            .groupby("embedding_id")["performance"]
-            .mean()
-        )
+        if getattr(self.router, "routing_data_train", None) is not None:
+            perf_by_query = (
+                self.router.routing_data_train
+                .groupby("embedding_id")["performance"]
+                .mean()
+            )
+        else:
+            # Use lightweight perf lookup attached by DataLoader
+            perf_by_query = {}
+            for emb, md in getattr(self.router, "_perf_lookup", {}).items():
+                vals = list(md.values())
+                perf_by_query[int(emb)] = float(sum(vals) / max(len(vals), 1)) if vals else 0.0
 
         # Seuil : si perf moyenne >= 0.8 → facile, sinon difficile
         difficulty_threshold = self.router.cfg["hparam"].get(
             "label_difficulty_threshold", 0.8
         )
+        # Iterate over embedding ids in the same order as query_embedding_list
+        if getattr(self.router, "routing_data_train", None) is not None:
+            emb_ids_iter = (
+                self.router.routing_data_train
+                .drop_duplicates("embedding_id")
+                .sort_values("embedding_id")["embedding_id"]
+            )
+        else:
+            emb_ids_iter = list(getattr(self.router, "_idx_to_embedding_id_arr", []))
 
-        for i, emb_id in enumerate(
-            self.router.routing_data_train
-            .drop_duplicates("embedding_id")
-            .sort_values("embedding_id")["embedding_id"]
-        ):
+        for i, emb_id in enumerate(emb_ids_iter):
             if i >= len(self.router.query_embedding_list):
                 break
             embedding = self.router.query_embedding_list[i]
-            mean_perf = perf_by_query.get(emb_id, 0.5)
+            mean_perf = perf_by_query.get(int(emb_id), 0.5)
 
             # Perf élevée = requête facile (tous les modèles y arrivent)
             # Perf faible = requête difficile (les modèles ont du mal)
-            label = 0.0 if mean_perf >= difficulty_threshold else 1.0
+            label = 1 - mean_perf 
 
             embeddings.append(embedding)
             labels.append(label)
 
-        n_easy = sum(1 for l in labels if l == 0.0)
-        n_hard = sum(1 for l in labels if l == 1.0)
+        n_easy = sum(1 for l in labels if l <= 0.5)
+        n_hard = sum(1 for l in labels if l > 0.5)
         print(f"📊 Données de difficulté (seuil perf={difficulty_threshold}) :")
         print(f"   Faciles (label=0) : {n_easy}")
         print(f"   Difficiles (label=1) : {n_hard}")
@@ -162,33 +176,43 @@ class GreenKNNRouterTrainer(BaseTrainer):
         Si un modèle pré-entraîné existe à ini_knn_path, on le charge
         en lieu et place d'un ajustement à partir de zéro.
         """
-        print("\n── Entraînement KNN ──")
+        print("\n── Entraînement KNN ──", flush=True)
+        print("[GREEN-TRAIN-DEBUG] _train_knn start", flush=True)
 
         if (
             self.ini_knn_path
             and os.path.exists(self.ini_knn_path)
             and self.ini_knn_path.endswith(".pkl")
         ):
-            print(f"   Chargement depuis {self.ini_knn_path}")
+            print(f"   Chargement depuis {self.ini_knn_path}", flush=True)
             self.router.knn_model = load_model(self.ini_knn_path)
         else:
-            print("   Ajustement de l'index KNN...")
+            print("   Ajustement de l'index KNN...", flush=True)
+            print(
+                f"[GREEN-TRAIN-DEBUG] KNN fit sizes: embeddings={len(self.router.query_embedding_list)}, labels={len(self.router.model_name_list)}",
+                flush=True,
+            )
             self.router.knn_model.fit(
                 self.router.query_embedding_list,
                 self.router.model_name_list,
             )
 
         # Construction du mapping index → embedding_id
-        routing_best = self.router.routing_data_train.loc[
-            self.router.routing_data_train.groupby("query")["performance"].idxmax()
-        ].reset_index(drop=True)
-        self.router._idx_to_embedding_id = {
-            i: int(row["embedding_id"])
-            for i, (_, row) in enumerate(routing_best.iterrows())
-        }
+        # Build idx -> embedding_id mapping using lightweight structures if available
+        if getattr(self.router, "routing_data_train", None) is None and getattr(self.router, "_idx_to_embedding_id_arr", None) is not None:
+            self.router._idx_to_embedding_id = {i: int(e) for i, e in enumerate(self.router._idx_to_embedding_id_arr.tolist())}
+        else:
+            routing_best = self.router.routing_data_train.loc[
+                self.router.routing_data_train.groupby("embedding_id")["performance"].idxmax()
+            ].reset_index(drop=True)
+            self.router._idx_to_embedding_id = {
+                i: int(row["embedding_id"])
+                for i, (_, row) in enumerate(routing_best.iterrows())
+            }
 
         save_model(self.router.knn_model, self.save_knn_path)
-        print(f"   ✅ KNN sauvegardé → {self.save_knn_path}")
+        print(f"   ✅ KNN sauvegardé → {self.save_knn_path}", flush=True)
+        print("[GREEN-TRAIN-DEBUG] _train_knn end", flush=True)
 
     # ------------------------------------------------------------------
     # Entraînement MLP de difficulté
@@ -206,18 +230,27 @@ class GreenKNNRouterTrainer(BaseTrainer):
             embeddings : liste d'arrays numpy [embedding_dim]
             labels     : liste de flottants (0.0 ou 1.0)
         """
-        print("\n── Entraînement MLP de difficulté ──")
+        print("\n── Entraînement MLP de difficulté ──", flush=True)
+        print("[GREEN-TRAIN-DEBUG] _train_difficulty_mlp start", flush=True)
 
         # Conversion en tenseurs PyTorch
         X = torch.tensor(
             np.array(embeddings), dtype=torch.float32
         )
         y = torch.tensor(labels, dtype=torch.float32).unsqueeze(1)
+        print(
+            f"[GREEN-TRAIN-DEBUG] tensor shapes: X={tuple(X.shape)}, y={tuple(y.shape)}",
+            flush=True,
+        )
 
         # DataLoader
         dataset = TensorDataset(X, y)
         loader  = DataLoader(
             dataset, batch_size=self.batch_size, shuffle=True
+        )
+        print(
+            f"[GREEN-TRAIN-DEBUG] dataloader batches={len(loader)} batch_size={self.batch_size}",
+            flush=True,
         )
 
         self.router.difficulty_estimator.train()
@@ -248,7 +281,7 @@ class GreenKNNRouterTrainer(BaseTrainer):
 
             avg = total_loss / max(n_batches, 1)
             print(f"  Époque {epoch + 1:>3}/{self.num_epochs} — "
-                  f"Loss moyenne : {avg:.4f}")
+                f"Loss moyenne : {avg:.4f}", flush=True)
 
         # Sauvegarde des poids du MLP
         if self.save_diff_path:
@@ -257,7 +290,8 @@ class GreenKNNRouterTrainer(BaseTrainer):
                 self.router.difficulty_estimator.state_dict(),
                 self.save_diff_path,
             )
-            print(f"   ✅ MLP sauvegardé → {self.save_diff_path}")
+            print(f"   ✅ MLP sauvegardé → {self.save_diff_path}", flush=True)
+        print("[GREEN-TRAIN-DEBUG] _train_difficulty_mlp end", flush=True)
 
     # ------------------------------------------------------------------
     # Point d'entrée principal
@@ -269,19 +303,38 @@ class GreenKNNRouterTrainer(BaseTrainer):
           1. Ajustement de l'index KNN
           2. Entraînement du MLP de difficulté
         """
-        print("\n" + "=" * 70)
-        print("Entraînement GreenKNNRouter")
-        print("=" * 70)
+        print("\n" + "=" * 70, flush=True)
+        print("Entraînement GreenKNNRouter", flush=True)
+        print("=" * 70, flush=True)
+        print("[GREEN-TRAIN-DEBUG] train() start", flush=True)
 
         # Étape 1 : KNN
-        self._train_knn()
+        try:
+            print("[GREEN-TRAIN-DEBUG] step1 _train_knn", flush=True)
+            self._train_knn()
+            print("[GREEN-TRAIN-DEBUG] step1 done", flush=True)
+        except Exception as exc:
+            print(f"[GREEN-TRAIN-DEBUG] step1 failed: {exc}", flush=True)
+            traceback.print_exc()
+            raise
 
         # Étape 2 : MLP de difficulté
-        embeddings, labels = self._prepare_difficulty_labels()
-        if embeddings:
-            self._train_difficulty_mlp(embeddings, labels)
-        else:
-            print("⚠️  Aucune donnée disponible pour entraîner le MLP.")
+        try:
+            print("[GREEN-TRAIN-DEBUG] step2 _prepare_difficulty_labels", flush=True)
+            embeddings, labels = self._prepare_difficulty_labels()
+            print(
+                f"[GREEN-TRAIN-DEBUG] labels prepared: embeddings={len(embeddings)}, labels={len(labels)}",
+                flush=True,
+            )
+            if embeddings:
+                self._train_difficulty_mlp(embeddings, labels)
+            else:
+                print("⚠️  Aucune donnée disponible pour entraîner le MLP.", flush=True)
+        except Exception as exc:
+            print(f"[GREEN-TRAIN-DEBUG] step2 failed: {exc}", flush=True)
+            traceback.print_exc()
+            raise
 
-        print("\n✅ Entraînement terminé !")
-        print("=" * 70)
+        print("\n✅ Entraînement terminé !", flush=True)
+        print("=" * 70, flush=True)
+        print("[GREEN-TRAIN-DEBUG] train() end", flush=True)

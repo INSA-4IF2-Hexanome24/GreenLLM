@@ -60,10 +60,19 @@ class UtilityScoringService:
 
         # Tri par utilité décroissante
         routers.sort(key=lambda x: x["utility"], reverse=True)
-
-        return {
-            "routers": routers,
-            "difficulty_score": float(result.get("difficulty_score", 0.0)),
-            "threshold": float(result.get("threshold", 0.0)),
-            "best_model": result.get("model_name"),
-        }
+        model_name = result.get("model_name")
+        if( model_name == "web_search" ):
+            return{
+                        "routers": routers,
+                        "difficulty_score": float(result.get("difficulty_score", 0.0)),
+                        "threshold": float(result.get("threshold", 0.0)),
+                        "best_model": model_name,
+                        "answers": result.get("answers", []),
+                }
+        else:
+            return {
+                "routers": routers,
+                "difficulty_score": float(result.get("difficulty_score", 0.0)),
+                "threshold": float(result.get("threshold", 0.0)),
+                "best_model": model_name,
+            }

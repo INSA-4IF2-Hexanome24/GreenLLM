@@ -263,35 +263,44 @@ class GreenKNNRouter(MetaRouter):
         # ------------------------------------------------------------------ #
         # 5. Données d'entraînement — lookups vectorisés (pas de iterrows)   #
         # ------------------------------------------------------------------ #
-        routing_best = self.routing_data_train.loc[
-            self.routing_data_train.groupby("query")["performance"].idxmax()
-        ].reset_index(drop=True)
+        # Prefer lightweight structures attached by DataLoader when available
+        if (getattr(self, "_perf_lookup", None) is not None) and (getattr(self, "_idx_to_embedding_id_arr", None) is not None) and (getattr(self, "query_embedding_list", None) is not None):
+            print("[GREEN-DEBUG] Using lightweight routing structures provided by DataLoader", flush=True)
+            # model_name_list should also be provided
+            if not getattr(self, "model_name_list", None):
+                # derive model_name_list from perf_lookup and idx mapping
+                ids = list(self._idx_to_embedding_id_arr.tolist())
+                self.model_name_list = [max(self._perf_lookup[int(e)].items(), key=lambda kv: kv[1])[0] for e in ids]
+        else:
+            routing_best = self.routing_data_train.loc[
+                self.routing_data_train.groupby("embedding_id")["performance"].idxmax()
+            ].reset_index(drop=True)
 
-        ids = routing_best["embedding_id"].tolist()
-        self.query_embedding_list = [self.query_embedding_data[i].numpy() for i in ids]
-        self.model_name_list      = routing_best["model_name"].tolist()
+            ids = routing_best["embedding_id"].tolist()
+            self.query_embedding_list = [self.query_embedding_data[i].numpy() for i in ids]
+            self.model_name_list = routing_best["model_name"].tolist()
 
-        # pivot_table au lieu de iterrows : 50-100× plus rapide
-        pivot = self.routing_data_train.pivot_table(
-            index="embedding_id",
-            columns="model_name",
-            values="performance",
-            aggfunc="first",
-        )
-        self._perf_lookup: Dict[int, Dict[str, float]] = {
-            int(eid): {
-                col: float(val)
-                for col, val in row.items()
-                if not np.isnan(val)
+            # pivot_table au lieu de iterrows : 50-100× plus rapide
+            pivot = self.routing_data_train.pivot_table(
+                index="embedding_id",
+                columns="model_name",
+                values="performance",
+                aggfunc="first",
+            )
+            self._perf_lookup = {
+                int(eid): {
+                    col: float(val)
+                    for col, val in row.items()
+                    if not np.isnan(val)
+                }
+                for eid, row in pivot.iterrows()
             }
-            for eid, row in pivot.iterrows()
-        }
 
-        # tableau numpy pour mapping O(1) : index KNN → embedding_id
-        self._idx_to_embedding_id_arr = np.array(
-            [int(row["embedding_id"]) for _, row in routing_best.iterrows()],
-            dtype=np.int64,
-        )
+            # numpy array mapping index KNN → embedding_id
+            self._idx_to_embedding_id_arr = np.array(
+                [int(row["embedding_id"]) for _, row in routing_best.iterrows()],
+                dtype=np.int64,
+            )
         self._log("init: training data prepared", init_start)
 
         # ------------------------------------------------------------------ #
