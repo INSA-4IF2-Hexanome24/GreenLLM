@@ -69,31 +69,23 @@ import Button from 'primevue/button'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
+import { useNavItems } from '@/composables/useNavItems'
 
 const route = useRoute()
 const router = useRouter()
 
 const pageTitles: Record<string, string> = {
   '/user/dashboard': 'Dashboard',
-  '/user/routing': 'Routing',
-  '/user/accounts': 'Accounts',
-  '/user/budget': 'Budget',
-  '/user/reports': 'Reports',
-  '/user/carbon': 'Carbon',
-  '/user/models': 'Models',
-  '/user/settings': 'Settings',
+  '/user/routing':   'Routing',
+  '/user/accounts':  'Accounts',
+  '/user/budget':    'Budget',
+  '/user/reports':   'Reports',
+  '/user/carbon':    'Carbon',
+  '/user/models':    'Models',
+  '/user/settings':  'Settings',
 }
 
-const navRoutes = [
-  { label: 'Dashboard', path: '/user/dashboard', icon: 'pi pi-home' },
-  { label: 'Routing',   path: '/user/routing',   icon: 'pi pi-map' },
-  { label: 'Accounts',  path: '/user/accounts',  icon: 'pi pi-user' },
-  { label: 'Budget',    path: '/user/budget',    icon: 'pi pi-wallet' },
-  { label: 'Reports',   path: '/user/reports',   icon: 'pi pi-chart-bar' },
-  { label: 'Carbon',    path: '/user/carbon',    icon: 'pi pi-globe' },
-  { label: 'Models',    path: '/user/models',    icon: 'pi pi-microchip-ai' },
-  { label: 'Settings',  path: '/user/settings',  icon: 'pi pi-cog' },
-]
+const { visibleNavItems } = useNavItems()
 
 const pageTitle = computed(() => pageTitles[route.path] ?? 'Dashboard')
 
@@ -102,9 +94,9 @@ const showResults = ref(false)
 const searchWrapRef = ref<HTMLElement | null>(null)
 
 const filteredRoutes = computed(() => {
-  if (!searchQuery.value.trim()) return navRoutes
+  if (!searchQuery.value.trim()) return visibleNavItems.value
   const q = searchQuery.value.toLowerCase()
-  return navRoutes.filter((r) => r.label.toLowerCase().includes(q))
+  return visibleNavItems.value.filter((r) => r.label.toLowerCase().includes(q))
 })
 
 function navigateTo(path: string) {

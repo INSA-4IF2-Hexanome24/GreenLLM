@@ -3,7 +3,7 @@
     <table class="accounts-table">
       <thead>
         <tr>
-          <th>#</th>
+          <!-- <th>#</th> -->
           <th>Member</th>
           <th>Department</th>
           <th>Monthly Budget</th>
@@ -14,66 +14,63 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(account, index) in accounts" :key="account.id">
-          <td class="accounts-table__index">
-            {{ String(index + 1).padStart(2, '0') }}.
-          </td>
-          <td>
+        <tr v-for="account in accounts" :key="account.id">
+        <td>
             <div class="accounts-table__member">
-              <img
+            <img
                 :src="account.avatar"
                 :alt="account.name"
                 class="accounts-table__avatar"
-              />
-              <span>{{ account.name }}</span>
+            />
+            <span>{{ account.name }}</span>
             </div>
-          </td>
-          <td>{{ account.department }}</td>
-          <td>${{ account.monthlyBudget.toLocaleString() }}</td>
-          <td>${{ account.used.toLocaleString() }}</td>
-          <td>
+        </td>
+        <td>{{ account.department }}</td>
+        <td>${{ account.monthlyBudget.toLocaleString() }}</td>
+        <td>${{ account.used.toLocaleString() }}</td>
+        <td>
             <div class="accounts-table__progress-wrap">
-              <div class="accounts-table__progress">
+            <div class="accounts-table__progress">
                 <div
-                  class="accounts-table__progress-bar"
-                  :class="getBarClass(account)"
-                  :style="{ width: getUsagePercent(account) + '%' }"
+                class="accounts-table__progress-bar"
+                :class="getBarClass(account)"
+                :style="{ width: getUsagePercent(account) + '%' }"
                 />
-              </div>
-              <span class="accounts-table__percent">
-                {{ getUsagePercent(account) }}%
-              </span>
             </div>
-          </td>
-          <td>
-            <span
-              class="accounts-table__status"
-              :class="`accounts-table__status--${getStatusClass(account)}`"
-            >
-              {{ getStatusLabel(account) }}
+            <span class="accounts-table__percent">
+                {{ getUsagePercent(account) }}%
             </span>
-          </td>
-          <td>
+            </div>
+        </td>
+        <td>
+            <span
+            class="accounts-table__status"
+            :class="`accounts-table__status--${getStatusClass(account)}`"
+            >
+            {{ getStatusLabel(account) }}
+            </span>
+        </td>
+        <td>
             <div class="accounts-table__actions">
-              <button
+            <button
                 class="accounts-table__btn accounts-table__btn--adjust"
                 @click="openAdjust(account)"
-              >
+            >
                 Adjust
-              </button>
-              <button
+            </button>
+            <button
                 class="accounts-table__btn"
                 :class="
-                  account.status === 'suspended'
+                account.status === 'suspended'
                     ? 'accounts-table__btn--reactivate'
                     : 'accounts-table__btn--suspend'
                 "
                 @click="toggleStatus(account)"
-              >
+            >
                 {{ account.status === 'suspended' ? 'Reactivate' : 'Suspend' }}
-              </button>
+            </button>
             </div>
-          </td>
+        </td>
         </tr>
       </tbody>
     </table>
