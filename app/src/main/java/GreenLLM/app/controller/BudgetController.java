@@ -62,6 +62,10 @@ public class BudgetController {
             throw new IllegalArgumentException("La requete n'appartient pas a cet utilisateur");
         }
 
+        if (reponse.getModelUtilise() != null && !modelLLM.getId().equals(reponse.getModelUtilise().getId())) {
+            throw new IllegalArgumentException("La reponse n'appartient pas a ce modele");
+        }
+
         BigDecimal cout = budgetService.chercherCoutPourUneRequete(modelLLM, requete, reponse);
         budgetService.ajouterConsommation(utilisateur, cout);
 
