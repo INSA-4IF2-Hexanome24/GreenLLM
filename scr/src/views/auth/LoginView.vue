@@ -132,9 +132,9 @@ async function handleLogin() {
 
   await new Promise((resolve) => setTimeout(resolve, 800))
 
-  const success = auth.login(username.value, password.value)
+  const user = await auth.login(username.value, password.value)
 
-  if (success) {
+  if (user) {
     router.push('/user/dashboard')
   } else {
     errorMsg.value = 'Invalid username or password.'
