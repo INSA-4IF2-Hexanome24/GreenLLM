@@ -44,10 +44,22 @@ export async function getQuota(): Promise<QuotaResult> {
   return { remaining: 10000, total: 10000 }
 }
 
+export interface WebSearchAnswer {
+  answer: string
+  source: string
+  score: number
+}
+
+export interface SubmitResult {
+  models: ModelResult[]
+  webSearch: boolean
+  answers: WebSearchAnswer[]
+}
+
 export async function submitPrompt(
   prompt: string,
   mode: 'router' | 'chat',
-): Promise<{ models: ModelResult[] }> {
+): Promise<SubmitResult> {
   const res = await fetch(`${API_BASE}/api/dashboard/stats`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -60,6 +72,16 @@ export async function submitPrompt(
 
   const data = await res.json()
 
+  // Web search case
+  if (data.webSearch) {
+    return {
+      models: [],
+      webSearch: true,
+      answers: data.answers ?? [],
+    }
+  }
+
+  // Normal LLM routing case
   const models: ModelResult[] = (data.statsPerModel ?? []).map(
     (item: any, index: number) => ({
       id: item.name,
@@ -74,7 +96,7 @@ export async function submitPrompt(
     }),
   )
 
-  return { models }
+  return { models, webSearch: false, answers: [] }
 }
 
 export async function useModel(

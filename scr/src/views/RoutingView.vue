@@ -110,6 +110,35 @@
       </div>
     </div>
 
+    <!-- Web Search Results -->
+  <div v-if="webSearch" class="routing-results">
+    <h2 class="routing-results__title">
+      <i class="pi pi-globe" style="margin-right: 0.5rem" />
+      Web Search Results
+    </h2>
+    <p class="routing-results__subtitle">
+      This query was answered directly from the web.
+    </p>
+    <div class="routing-results__list">
+      <div
+        v-for="(answer, index) in webAnswers"
+        :key="index"
+        class="web-answer-card"
+      >
+        <p class="web-answer-card__text">{{ answer.answer }}</p>
+        <a
+          :href="answer.source"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="web-answer-card__source"
+        >
+          <i class="pi pi-external-link" />
+          {{ answer.source }}
+        </a>
+      </div>
+    </div>
+  </div>
+
     <!-- Response Dialog -->
     <Dialog
       v-model:visible="responseDialog.visible"
@@ -164,7 +193,7 @@ import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
 import { getQuota, submitPrompt, useModel } from '@/services/routingService'
 import { useRoutingStore } from '@/stores/routing'
-import type { ModelResult } from '@/services/routingService'
+import type { ModelResult , WebSearchAnswer } from '@/services/routingService'
 
 const toast = useToast()
 const routingStore = useRoutingStore()
@@ -194,11 +223,22 @@ onMounted(async () => {
   }
 })
 
+const webSearch = ref(false)
+const webAnswers = ref<WebSearchAnswer[]>([])
+
 async function handleSubmit() {
   loading.value = true
+  webSearch.value = false
+  webAnswers.value = []
+  models.value = []
   try {
     const result = await submitPrompt(prompt.value, mode.value)
-    models.value = result.models
+    if (result.webSearch) {
+      webSearch.value = true
+      webAnswers.value = result.answers
+    } else {
+      models.value = result.models
+    }
   } catch (err) {
     toast.add({
       severity: 'error',

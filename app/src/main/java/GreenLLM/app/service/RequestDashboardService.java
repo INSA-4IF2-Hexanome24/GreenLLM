@@ -8,7 +8,7 @@ import GreenLLM.app.repository.EntrepriseRepository;
 import GreenLLM.app.model.ModelLLM;
 import GreenLLM.app.repository.ModelLLMRepository;
 import GreenLLM.app.repository.RequeteRepository;
-
+import GreenLLM.app.dto.WebSearchAnswerDto;
 import GreenLLM.app.dto.RequestDashboardResponse;
 import GreenLLM.app.dto.RequestModelStatsDto;
 import GreenLLM.app.dto.RouterScoreDto;
@@ -55,46 +55,45 @@ public class RequestDashboardService {
     }*/
 
     public RequestDashboardResponse getLlmComparison(String queryText) {
-            
-            // 1. Llamada GET a FastAPI pasándole el query parameter
-            UtilityScoresFastApi responseFastAPI = fastapiClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/utility-scores")
-                            .queryParam("query", queryText) // Añade ?query=... a la URL
-                            .build())
-                    .retrieve()
-                    .body(UtilityScoresFastApi.class); // Spring convierte el JSON a esta clase
 
-            // 2. Mapear los datos de FastAPI a tu DTO del Front
-            List<RequestModelStatsDto> statsList = new ArrayList<>();
-            
-            // Verificamos que no sea nulo por seguridad
-            if (responseFastAPI != null && responseFastAPI.getRouters() != null) {
-                for (RouterScoreDto router : responseFastAPI.getRouters()) {
-                    RequestModelStatsDto dto = new RequestModelStatsDto();
-                    
-                    dto.setName(router.getModel()); // Mapea 'model' a 'name'
-                    dto.setPerformanceScore(router.getPerformance()); // Mapea 'performance'
-                    dto.setCo2CostScore(router.getCo2()); // Mapea 'co2'
-                    
-                    // Convierto la utilidad (double) a String para el campo 'power' que me pasaste antes
-                    //dto.setPower(String.valueOf(router.getUtility())); 
-                    
-                    // In RequestDashboardService.getLlmComparison(), inside the for loop:
-                    dto.setName(router.getModel());
-                    dto.setPerformanceScore(router.getPerformance());
-                    dto.setCo2CostScore(router.getCo2());
+        UtilityScoresFastApi responseFastAPI = fastapiClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/utility-scores")
+                        .queryParam("query", queryText)
+                        .build())
+                .retrieve()
+                .body(UtilityScoresFastApi.class);
 
-                    // Derive power label server-side
-                    double perf = router.getPerformance();
-                    String power = perf >= 0.7 ? "High" : perf >= 0.4 ? "Medium" : "Low";
-                    dto.setPower(power);
-
-                    statsList.add(dto);
-                }
-            }
-
-            // 3. Retornamos el objeto final
-            return new RequestDashboardResponse(statsList);
+        if (responseFastAPI == null) {
+            return new RequestDashboardResponse(List.of());
         }
+
+        
+        if ("web_search".equals(responseFastAPI.getBest_model())) {
+            List<WebSearchAnswerDto> answers = responseFastAPI.getAnswers() != null
+                    ? responseFastAPI.getAnswers()
+                    : List.of();
+            return new RequestDashboardResponse(answers, true);
+        }
+
+        
+        List<RequestModelStatsDto> statsList = new ArrayList<>();
+
+        if (responseFastAPI.getRouters() != null) {
+            for (RouterScoreDto router : responseFastAPI.getRouters()) {
+                RequestModelStatsDto dto = new RequestModelStatsDto();
+                dto.setName(router.getModel());
+                dto.setPerformanceScore(router.getPerformance());
+                dto.setCo2CostScore(router.getCo2());
+
+                double perf = router.getPerformance();
+                String power = perf >= 0.7 ? "High" : perf >= 0.4 ? "Medium" : "Low";
+                dto.setPower(power);
+
+                statsList.add(dto);
+            }
+        }
+
+        return new RequestDashboardResponse(statsList);
+    }
 }

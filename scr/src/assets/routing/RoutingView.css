@@ -241,3 +241,37 @@
   line-height: 1.6;
   white-space: pre-wrap;
 }
+
+.routing-results__subtitle {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+  margin: -0.5rem 0 1rem;
+}
+
+.web-answer-card {
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.web-answer-card__text {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.web-answer-card__source {
+  font-size: 0.75rem;
+  color: var(--primary-color);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.web-answer-card__source:hover {
+  text-decoration: underline;
+}
