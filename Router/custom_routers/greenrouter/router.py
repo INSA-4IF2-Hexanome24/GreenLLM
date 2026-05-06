@@ -537,6 +537,19 @@ class GreenKNNRouter(MetaRouter):
 
         # (3) Branche web search
         if self.use_web_search and difficulty > self.web_search_threshold:
+            # Même en mode web_search, on calcule les scores LLM pour analyse.
+            step = perf_counter()
+            candidates = self._select_candidates(difficulty)
+            co2_norm = (
+                self._build_co2_norm(candidates)
+                if candidates is not self._candidate_models
+                else self._co2_norm
+            )
+            perf_scores = self._knn_perf_scores(embedding, candidates)
+            utility_scores = self._compute_utility(perf_scores, candidates, difficulty, co2_norm)
+            co2_scores = {m: self.co2_data.get(m, 0.0) for m in candidates}
+            self._log("route_single: LLM utility computed for web branch", step)
+
             step = perf_counter()
             web_result = self._try_web_search(query_text)
             self._log("route_single: web search done", step)
@@ -549,9 +562,9 @@ class GreenKNNRouter(MetaRouter):
                     "source":         web_result["source"],
                     "answers":        web_result["answers"],
                     "tfidf_score":    web_result["tfidf_score"],
-                    "perf_scores":    {},
-                    "co2_scores":     {},
-                    "utility_scores": {},
+                    "perf_scores":    perf_scores,
+                    "co2_scores":     co2_scores,
+                    "utility_scores": utility_scores,
                     "decision_reason": (
                         f"difficulty {difficulty:.3f} > web_search_threshold "
                         f"{self.web_search_threshold} → web search réussi"
@@ -565,9 +578,9 @@ class GreenKNNRouter(MetaRouter):
             output.update({
                 "model_name":     fallback,
                 "method":         "web_fallback_llm",
-                "perf_scores":    {},
-                "co2_scores":     {fallback: self.co2_data.get(fallback, 0.0)},
-                "utility_scores": {},
+                "perf_scores":    perf_scores,
+                "co2_scores":     co2_scores,
+                "utility_scores": utility_scores,
                 "decision_reason": (
                     f"difficulty {difficulty:.3f} > web_search_threshold "
                     f"{self.web_search_threshold} → web sans résultat "
@@ -918,9 +931,31 @@ class GreenKNNRouter(MetaRouter):
 
         # ---- 5. Web search (séquentiel — réseau) ------------------------- #
         if web_indices:
+            # Pré-calcul des scores LLM pour les requêtes orientées web.
+            score_step = perf_counter()
+            web_embeddings = embeddings[web_indices]
+            distances_web_batch, indices_web_batch = self.knn_model.kneighbors(web_embeddings)
+
+            full_candidates = self._candidate_models
+            small_candidates = [m for m in full_candidates if m in self.small_models] or full_candidates
+            full_co2_norm = self._co2_norm
+            small_co2_norm = self._build_co2_norm(small_candidates)
+            self._log("route_batch: web-branch LLM scores precomputed", score_step)
+
             step = perf_counter()
-            for i in web_indices:
+            for rank, i in enumerate(web_indices):
                 diff       = float(difficulties[i])
+                use_small  = diff < self.threshold and bool(self.small_models)
+                candidates = small_candidates if use_small else full_candidates
+                co2_norm   = small_co2_norm if use_small else full_co2_norm
+                perf_scores = self._aggregate_knn(
+                    distances_web_batch[rank],
+                    indices_web_batch[rank],
+                    candidates,
+                )
+                utility_scores = self._compute_utility(perf_scores, candidates, diff, co2_norm)
+                co2_scores = {m: self.co2_data.get(m, 0.0) for m in candidates}
+
                 web_result = self._try_web_search(queries[i])
                 if web_result:
                     routing_results[i] = {
@@ -935,9 +970,9 @@ class GreenKNNRouter(MetaRouter):
                         "source":               web_result["source"],
                         "answers":              web_result["answers"],
                         "tfidf_score":          web_result["tfidf_score"],
-                        "perf_scores":          {},
-                        "co2_scores":           {},
-                        "utility_scores":       {},
+                        "perf_scores":          perf_scores,
+                        "co2_scores":           co2_scores,
+                        "utility_scores":       utility_scores,
                         "decision_reason": (
                             f"difficulty {diff:.3f} > web_search_threshold "
                             f"{self.web_search_threshold} → web search réussi"
@@ -953,9 +988,9 @@ class GreenKNNRouter(MetaRouter):
                         "web_search_threshold": self.web_search_threshold,
                         "model_name":           fallback,
                         "method":               "web_fallback_llm",
-                        "perf_scores":          {},
-                        "co2_scores":           {fallback: self.co2_data.get(fallback, 0.0)},
-                        "utility_scores":       {},
+                        "perf_scores":          perf_scores,
+                        "co2_scores":           co2_scores,
+                        "utility_scores":       utility_scores,
                         "decision_reason": (
                             f"difficulty {diff:.3f} > web_search_threshold "
                             f"{self.web_search_threshold} → web sans résultat "
