@@ -1,7 +1,7 @@
 """
 GreenKNNRouter  —  version finale
 ----------------------------------
-Base : version qui fonctionne à l'entraînement (doc4)
+Base : version qui fonctionne à l'entraînement
 Optimisations intégrées :
   1.  KNN chargé UNE FOIS dans __init__ (conditionnel si fichier existe).
   2.  Batch embeddings : route_batch calcule tous les embeddings en un seul
@@ -72,6 +72,65 @@ except ImportError:
 # Module d'estimation de difficulté
 # ---------------------------------------------------------------------------
 
+
+"""
+Module : DifficultyEstimator
+---------------------------
+
+Ce module implémente un petit réseau de neurones (MLP) chargé d’estimer
+la difficulté d’une requête utilisateur à partir de son embedding.
+
+Objectif
+--------
+Produire un score de difficulté compris entre 0 et 1 :
+    - 0   → requête difficile (ex: raisonnement complexe, ambigu)
+    - 1   → requête facile  (ex: question simple, factuelle)
+Ce score est utilisé par le router pour :
+    - privilégier des petits modèles rapides si la requête est facile
+    - utiliser des modèles plus puissants si la requête est difficile
+    - éventuellement déclencher une recherche web
+
+Architecture
+------------
+Le modèle est un MLP (Multi-Layer Perceptron) composé de :
+    1. Une couche linéaire (input_dim → hidden_dim)
+    2. Une activation ReLU (introduit de la non-linéarité)
+    3. Un Dropout (10%) pour éviter l’overfitting
+    4. Une deuxième couche linéaire (hidden_dim → hidden_dim // 2)
+    5. Une seconde ReLU
+    6. Une couche de sortie (→ 1 valeur)
+    7. Une Sigmoid pour obtenir un score entre 0 et 1
+
+Flux des données
+----------------
+Entrée :
+    - embedding de la requête (vecteur de taille input_dim, ex: 768)
+
+Sortie :
+    - score de difficulté (float ∈ [0, 1])
+
+Exemple :
+    "Quelle heure est-il ?" → 0.1 (facile)
+    "Explique la relativité générale" → 0.9 (difficile)
+
+Remarques importantes
+---------------------
+- Le modèle doit être entraîné pour être fiable.
+  Sinon, les scores seront aléatoires (poids initiaux).
+
+- Le modèle est utilisé en mode inference uniquement (pas d’apprentissage en ligne).
+
+- Le choix d’un MLP simple permet :
+    - une exécution rapide
+    - une intégration efficace en batch
+    - un coût computationnel faible
+
+En résumé
+---------
+Ce module sert de "thermomètre de difficulté" pour guider les décisions
+du router et optimiser le compromis performance / coût (temps, CO₂).
+"""
+
 class DifficultyEstimator(nn.Module):
     """
     MLP léger estimant la difficulté d'une requête ∈ [0, 1].
@@ -97,9 +156,75 @@ class DifficultyEstimator(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Module de recherche web (doc5)
+# Module de recherche web 
 # ---------------------------------------------------------------------------
+"""
+TF-IDF dans ce module
+--------------------
 
+Le vectoriseur TF-IDF utilisé ici ne repose pas sur un dictionnaire
+pré-entraîné ou externe. Il construit son propre vocabulaire
+dynamiquement à chaque appel.
+
+Fonctionnement
+--------------
+Lors de l'appel :
+    tfidf_matrix = vectorizer.fit_transform([query] + texts)
+
+Le vocabulaire est créé à partir :
+    - de la requête utilisateur (query)
+    - des textes récupérés depuis DuckDuckGo (texts)
+
+Cela signifie que chaque recherche possède son propre "mini dictionnaire"
+adapté au contexte de la requête.
+
+Exemple
+-------
+Requête :
+    "climate change effects"
+
+Textes :
+    "climate change impacts global temperature"
+    "effects of global warming"
+
+Vocabulaire généré :
+    - mots simples (unigrams) :
+        "climate", "change", "effects", "global", "warming", etc.
+    - groupes de mots (bigrams, car ngram_range=(1,2)) :
+        "climate change", "global warming", etc.
+
+Stop words
+----------
+Le paramètre :
+    stop_words="english"
+
+supprime automatiquement les mots très fréquents (ex: "the", "is", "and"),
+en utilisant une liste interne de scikit-learn.
+
+Important
+---------
+- Le vocabulaire est recréé à chaque appel (pas de mémoire globale)
+- Il dépend uniquement de la requête et des résultats récupérés
+- Aucun dictionnaire externe (WordNet, etc.) n'est utilisé
+
+Avantages
+---------
+- Adapté à chaque requête
+- Rapide à calculer
+- Pas besoin de données d'entraînement globales
+
+Limites
+-------
+- Ne capture pas le sens des mots (pas sémantique)
+- Sensible aux variations de vocabulaire
+- Pas de connaissance globale accumulée
+
+En résumé
+---------
+Le TF-IDF ici fonctionne comme un système local et temporaire
+de pondération des mots pour mesurer la similarité entre la requête
+et les résultats web.
+"""
 class WebSearcher:
     """Recherche DuckDuckGo + filtrage TF-IDF. Vectoriseur réutilisé."""
 
@@ -173,6 +298,81 @@ class WebSearcher:
 # ---------------------------------------------------------------------------
 # Routeur principal
 # ---------------------------------------------------------------------------
+"""
+Module : GreenKNNRouter
+----------------------
+
+Ce module constitue le cœur du système de routage. Il décide quel modèle
+LLM (ou une réponse web) utiliser pour répondre à une requête utilisateur,
+en optimisant à la fois la performance et le coût (notamment CO₂).
+
+Objectif
+--------
+Sélectionner automatiquement la meilleure stratégie parmi :
+    - un modèle LLM (petit ou grand)
+    - une réponse issue du web (DuckDuckGo)
+
+Le choix repose sur plusieurs signaux combinés intelligemment.
+
+Composants utilisés
+-------------------
+1. KNN (K-Nearest Neighbors)
+   → estime la performance des modèles en se basant sur des requêtes similaires
+
+2. MLP de difficulté
+   → prédit si la requête est facile ou difficile
+
+3. Données CO₂
+   → associent un coût environnemental à chaque modèle
+
+4. Web search
+   → permet de répondre directement sans LLM dans certains cas
+
+5. Fonction d’utilité
+   → combine performance, coût CO₂ et difficulté pour choisir le meilleur modèle
+
+Logique de décision
+-------------------
+1. Transformer la requête en embedding
+2. Estimer sa difficulté (score entre 0 et 1)
+3. Si difficulté élevée :
+       → tenter une recherche web
+       → fallback vers un petit modèle si échec
+4. Sinon :
+       → sélectionner un ensemble de modèles candidats :
+            - petits modèles si requête facile
+            - tous les modèles si requête difficile
+       → estimer la performance via KNN
+       → calculer une utilité pour chaque modèle :
+            utility = performance - coût CO₂ (pondéré)
+            ajustée selon la difficulté
+       → choisir le modèle avec la meilleure utilité
+
+Optimisations intégrées
+----------------------
+- Chargement unique du KNN
+- Calculs batch (embeddings, MLP, KNN)
+- Pré-calcul des normalisations CO₂
+- Utilisation de structures rapides (pivot pandas)
+- Appels API parallélisés (asyncio)
+
+Sortie
+------
+Pour chaque requête, le router retourne :
+    - modèle sélectionné
+    - score de difficulté
+    - scores de performance estimés (KNN)
+    - coût CO₂
+    - scores d’utilité
+    - raison de la décision (explication lisible)
+    - réponse finale (LLM ou web)
+
+En résumé
+---------
+GreenKNNRouter est un routeur intelligent qui combine apprentissage
+automatique, recherche d’information et optimisation écologique pour
+choisir dynamiquement la meilleure façon de répondre à une requête.
+"""
 
 class GreenKNNRouter(MetaRouter):
     """
