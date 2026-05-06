@@ -1,6 +1,5 @@
-// src/services/routingService.ts
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+const OLLAMA_BASE = import.meta.env.VITE_OLLAMA_BASE_URL ?? 'http://127.0.0.1:55555'
 
 export interface ModelResult {
   id: string
@@ -19,6 +18,12 @@ export interface QuotaResult {
   total: number
 }
 
+export interface UseModelResult {
+  success: boolean
+  modelId: string
+  response: string
+}
+
 function getPowerLabel(performance: number): 'Low' | 'Medium' | 'High' {
   if (performance >= 0.7) return 'High'
   if (performance >= 0.4) return 'Medium'
@@ -28,7 +33,8 @@ function getPowerLabel(performance: number): 'Low' | 'Medium' | 'High' {
 function getModelIcon(modelName: string): string {
   const name = modelName.toLowerCase()
   if (name.includes('llama') || name.includes('meta')) return '/meta-color.svg'
-  if (name.includes('mistral') || name.includes('mixtral')) return '/mistral-color.svg'
+  if (name.includes('mistral') || name.includes('mixtral'))
+    return '/mistral-color.svg'
   if (name.includes('qwen')) return '/qwen-color.svg'
   return '/meta-color.svg'
 }
@@ -54,7 +60,6 @@ export async function submitPrompt(
 
   const data = await res.json()
 
-  // data.statsPerModel is the array from RequestDashboardResponse
   const models: ModelResult[] = (data.statsPerModel ?? []).map(
     (item: any, index: number) => ({
       id: item.name,
@@ -62,9 +67,9 @@ export async function submitPrompt(
       tag: index === 0 ? 'Best match' : `#${index + 1}`,
       co2: item.co2CostScore,
       power: getPowerLabel(item.performanceScore),
-      cost: +(item.co2CostScore * 0.03).toFixed(4), // derived — replace if you add a cost field
+      cost: +(item.co2CostScore * 0.03).toFixed(4),
       icon: getModelIcon(item.name),
-      utility: item.performanceScore, // closest available proxy
+      utility: item.performanceScore,
       performanceScore: item.performanceScore,
     }),
   )
@@ -72,12 +77,29 @@ export async function submitPrompt(
   return { models }
 }
 
-export async function useModel(modelId: string, prompt: string) {
-  // TODO: implement when inference endpoint is ready
-  await new Promise((resolve) => setTimeout(resolve, 800))
+export async function useModel(
+  modelId: string,
+  prompt: string,
+): Promise<UseModelResult> {
+  const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'mistral:latest',
+      prompt,
+      stream: false,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`Ollama error: ${res.status} ${res.statusText}`)
+  }
+
+  const data = await res.json()
+
   return {
     success: true,
     modelId,
-    response: `[Mock] Using ${modelId} for: "${prompt.slice(0, 40)}..."`,
+    response: data.response ?? '',
   }
 }

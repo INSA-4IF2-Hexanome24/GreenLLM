@@ -193,3 +193,51 @@
   border-radius: 2rem !important;
   min-width: 70px;
 }
+
+.response-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.response-dialog__meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.response-dialog__icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.response-dialog__info {
+  display: flex;
+  flex-direction: column;
+}
+
+.response-dialog__label {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.response-dialog__name {
+  font-weight: 600;
+}
+
+.response-dialog__section-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.response-dialog__prompt p,
+.response-dialog__response p {
+  margin: 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
