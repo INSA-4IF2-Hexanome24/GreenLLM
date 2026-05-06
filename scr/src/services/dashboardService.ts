@@ -37,9 +37,9 @@ export async function getExpenseStatistics() {
 
 export async function getCreditTransferContacts() {
   return [
-    { id: 1, name: 'Livia Bator', role: 'CEO',      avatar: 'https://i.pravatar.cc/150?img=1' },
-    { id: 2, name: 'Randy Press', role: 'Director',  avatar: 'https://i.pravatar.cc/150?img=2' },
-    { id: 3, name: 'Workman',     role: 'Designer',  avatar: 'https://i.pravatar.cc/150?img=3' },
+    { id: 1, name: 'Livia Bator', role: 'CEO',      avatar: '\ProfilePic.png' },
+    { id: 2, name: 'Randy Press', role: 'Director',  avatar: '\ProfilePic.png' },
+    { id: 3, name: 'Workman',     role: 'Designer',  avatar: '\ProfilePic.png' },
   ]
 }
 
