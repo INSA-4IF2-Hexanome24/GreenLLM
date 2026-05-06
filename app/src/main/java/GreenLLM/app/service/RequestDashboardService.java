@@ -80,6 +80,16 @@ public class RequestDashboardService {
                     // Convierto la utilidad (double) a String para el campo 'power' que me pasaste antes
                     //dto.setPower(String.valueOf(router.getUtility())); 
                     
+                    // In RequestDashboardService.getLlmComparison(), inside the for loop:
+                    dto.setName(router.getModel());
+                    dto.setPerformanceScore(router.getPerformance());
+                    dto.setCo2CostScore(router.getCo2());
+
+                    // Derive power label server-side
+                    double perf = router.getPerformance();
+                    String power = perf >= 0.7 ? "High" : perf >= 0.4 ? "Medium" : "Low";
+                    dto.setPower(power);
+
                     statsList.add(dto);
                 }
             }

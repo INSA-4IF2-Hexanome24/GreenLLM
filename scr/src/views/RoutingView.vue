@@ -121,6 +121,8 @@ import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { getQuota, submitPrompt, useModel } from '@/services/routingService'
 import { useRoutingStore } from '@/stores/routing'
+import type { ModelResult } from '@/services/routingService'
+
 
 const toast = useToast()
 const routingStore = useRoutingStore()
@@ -129,7 +131,7 @@ const mode = ref<'router' | 'chat'>('router')
 const prompt = ref('')
 const loading = ref(false)
 const usingModelId = ref<number | null>(null)
-const models = ref<any[]>([])
+const models = ref<ModelResult[]>([])
 const quota = ref({ remaining: 10000, total: 10000 })
 
 onMounted(async () => {
@@ -145,9 +147,19 @@ onMounted(async () => {
 
 async function handleSubmit() {
   loading.value = true
-  const result = await submitPrompt(prompt.value, mode.value)
-  models.value = result.models
-  loading.value = false
+  try {
+    const result = await submitPrompt(prompt.value, mode.value)
+    models.value = result.models
+  } catch (err) {
+    toast.add({
+      severity: 'error',
+      summary: 'Request failed',
+      detail: err instanceof Error ? err.message : 'Unknown error',
+      life: 4000,
+    })
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleUseModel(model: any) {
@@ -164,9 +176,18 @@ async function handleUseModel(model: any) {
   }
 }
 
+function getModelIcon(modelName: string): string {
+  const name = modelName.toLowerCase()
+  if (name.includes('llama') || name.includes('meta')) return '/meta-color.svg'
+  if (name.includes('mistral') || name.includes('mixtral')) return '/mistral-color.svg'
+  if (name.includes('qwen')) return '/qwen-color.svg'
+  return '/meta-color.svg' // default fallback
+}
+
 function onImgError(e: Event) {
   const img = e.target as HTMLImageElement
-  img.src = 'https://primefaces.org/cdn/primevue/images/avatar/amyelsner.png'
+  const modelName = img.alt ?? ''
+  img.src = getModelIcon(modelName)
 }
 </script>
 
