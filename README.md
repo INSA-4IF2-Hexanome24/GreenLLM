@@ -41,6 +41,18 @@ install dependencies
 pip install -e .
 ```
 
+### train the model
+```
+cd Router
+python -m llmrouter.cli.router_train --router greenrouter --config custom_routers/greenrouter/config.yaml
+```
+
+### test the model
+```
+cd Router
+python -m llmrouter.cli.router_inference --router greenrouter --config custom_routers/greenrouter/config.yaml --query "What is the capital of France?" --route-only
+```
+
 ### start fastapi server
 ```
 cd Router
