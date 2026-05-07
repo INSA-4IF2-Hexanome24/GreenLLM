@@ -409,3 +409,6 @@ http://127.0.0.1:8000
 ```
 
 Si la base est vide apres redemarrage, c'est normal : H2 est configuree en memoire avec `jdbc:h2:mem:greenllm`.
+
+
+[Open the PDF](pdfs/Rapport.pdf)
