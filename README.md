@@ -4,6 +4,17 @@
 
 https://github.com/user-attachments/assets/3a502337-14e5-4501-b458-eaec8ba1ce75
 
+## Contributeurs
+- REY LLOPIS Jaime
+- VASQUEZ Juan Martin
+- REINA--KUNTZIGER Lou
+- DIAZ Juan Jose
+- SHILI Ibrahim
+- GAROUX Ewan
+
+![Insalogo](images/logo-insa_0.png)
+
+## Description
 
 GreenLLM est une application qui combine :
 
