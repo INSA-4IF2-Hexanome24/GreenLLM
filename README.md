@@ -5,22 +5,25 @@ GreenLLM est une application qui combine :
 - une API Spring Boot pour gerer les utilisateurs, entreprises, budgets, requetes, reponses, transactions et modeles LLM ;
 - un service FastAPI Python pour calculer les scores carbone et router les requetes vers les modeles les plus adaptes ;
 - une base H2 en memoire pour le developpement.
+- un front en Vue.js pour les interactions avec l’utilisateur
 
 ## Architecture
 
 ```text
 GreenLLM/
-|-- app/       # Backend Java Spring Boot
-`-- Router/    # Service Python FastAPI / LLM router
-```
+├── app/       # Backend Java Spring Boot
+├── Router/    # Service Python FastAPI / LLM router
+└── scr/       # Frontend Vue 
 
 Par defaut :
 
-- Spring Boot : `http://localhost:8080`
-- FastAPI : `http://127.0.0.1:8000`
-- H2 Console : `http://localhost:8080/h2-console`
-- Swagger Spring : `http://localhost:8080/swagger-ui/index.html`
-- Swagger FastAPI : `http://127.0.0.1:8000/docs`
+- Spring Boot: `http://localhost:8080`
+- FastAPI: `http://127.0.0.1:8000`
+- Ollama: `http://127.0.0.1:55555`
+- Vue Frontend: `http://localhost:5173`
+- H2 Console: `http://localhost:8080/h2-console`
+- Swagger Spring: `http://localhost:8080/swagger-ui/index.html`
+- Swagger FastAPI: `http://127.0.0.1:8000/docs`
 
 ## Prerequis
 
@@ -28,6 +31,9 @@ Par defaut :
 - Maven ou le Maven Wrapper du projet
 - Python 3.10+
 - pip
+- Node.js 18+
+- npm
+
 
 ## Lancer le Router FastAPI
 
@@ -96,6 +102,58 @@ Password: laisser vide
 ```
 
 La table `ModelLLM` est automatiquement peuplee au demarrage dans `AppApplication.java`.
+## Frontend (Vue 3)
+
+### Stack technique
+
+- [Vue 3](https://vuejs.org/) + Composition API
+- [Vite](https://vitejs.dev/)
+- [PrimeVue](https://primevue.org/) — bibliothèque de composants UI
+- [Pinia](https://pinia.vuejs.org/) — gestion d’état
+- [Vue Router](https://router.vuejs.org/) — routage côté client
+
+### Vues
+
+| Vue | Description |
+|---|---|
+| `LandingView` | Page d’accueil / point d’entrée |
+| `LoginView` | Connexion utilisateur |
+| `RegisterView` | Inscription utilisateur |
+| `DashboardView` | Tableau de bord utilisateur individuel |
+| `DashboardViewEMP` | Tableau de bord entreprise |
+| `RoutingView` | Routeur LLM sensible à l’empreinte carbone |
+| `CarbonView` | Estimation de l’empreinte carbone |
+| `BudgetView` | Suivi du budget |
+| `ReportsView` | Rapports d’utilisation |
+| `ModelsView` | Modèles LLM disponibles |
+| `AccountsView` | Gestion des comptes |
+| `SettingsView` | Paramètres |
+
+### Prérequis
+
+- Node.js 18+
+- npm
+
+### Variables d’environnement
+
+Créer un fichier `.env` à la racine du dossier `scr/` :
+
+```text
+VITE_API_BASE_URL=http://localhost:8080
+VITE_OLLAMA_BASE_URL=http://127.0.0.1:55555
+```
+
+> Toutes les variables doivent être préfixées par `VITE_` afin d’être exposées par Vite.
+
+### Installation et exécution
+
+```powershell
+cd scr
+npm install
+npm run dev
+```
+
+L’application sera disponible à l’adresse `http://localhost:5173`.
 
 ## Flux Front Typique
 
