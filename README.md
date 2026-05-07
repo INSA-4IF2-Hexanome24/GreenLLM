@@ -19,6 +19,7 @@ GreenLLM/
 ├── app/       # Backend Java Spring Boot
 ├── Router/    # Service Python FastAPI / LLM router
 └── scr/       # Frontend Vue 
+```
 
 Par defaut :
 
