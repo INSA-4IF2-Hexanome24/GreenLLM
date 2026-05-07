@@ -1,5 +1,10 @@
 # GreenLLM
 
+
+
+https://github.com/user-attachments/assets/3a502337-14e5-4501-b458-eaec8ba1ce75
+
+
 GreenLLM est une application qui combine :
 
 - une API Spring Boot pour gerer les utilisateurs, entreprises, budgets, requetes, reponses, transactions et modeles LLM ;
